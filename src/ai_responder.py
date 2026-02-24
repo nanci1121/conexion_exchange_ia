@@ -38,7 +38,7 @@ class AIResponder:
         
         try:
             logging.info(f"Enviando petición a LLM para tarea: {task}")
-            response = requests.post(self.generate_endpoint, json=payload, timeout=60)
+            response = requests.post(self.generate_endpoint, json=payload, timeout=300)
             response.raise_for_status()
             
             data = response.json()

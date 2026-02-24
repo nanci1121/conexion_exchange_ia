@@ -19,9 +19,13 @@ services:
       context: ./llm_service
       dockerfile: Dockerfile
     container_name: email_ai_llm
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CPU_THREADS=2
     volumes:
       # Montamos la carpeta del modelo final; asegúrate de que exista la ruta
       - ./modelo_correos_final:/app/modelo_correos_final
+      - hf_cache:/root/.cache/huggingface
     ports:
       - "8000:8000"
     # Descomenta las siguientes líneas si tienes NVIDIA Container Toolkit instalado en WSL
@@ -40,7 +44,10 @@ services:
       context: ./
       dockerfile: Dockerfile
     container_name: email_ai_app
+    ports:
+      - "8080:8080"
     environment:
+      - PYTHONUNBUFFERED=1
       - DB_HOST=postgres_vectordb
       - DB_PORT=5432
       - DB_USER=${DB_USER:-email_ai_user}
@@ -57,7 +64,9 @@ services:
       - ./src:/app/src
       # También montamos la carpeta global config/
       - ./config:/app/config
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8080
     restart: unless-stopped
 
 volumes:
   pgdata:
+  hf_cache:

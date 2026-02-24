@@ -1,3 +1,6 @@
+fastapi>=0.109.0
+uvicorn>=0.27.0
+python-multipart>=0.0.6
 exchangelib>=5.2.0
 psycopg2-binary>=2.9.9
 requests>=2.31.0

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email AI - Dashboard de Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+    <div class="glass-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>Email<span>AI</span></h1>
+            </div>
+            <nav>
+                <a href="#" class="active"><i class="icon-dashboard"></i> Dashboard</a>
+                <a href="#"><i class="icon-mail"></i> Correos</a>
+                <a href="#"><i class="icon-brain"></i> Conocimiento</a>
+                <a href="#"><i class="icon-settings"></i> Ajustes</a>
+            </nav>
+            <div class="status-badge">
+                <div class="pulse-indicator" id="main-status-dot"></div>
+                <span id="main-status-text">Sistema Activo</span>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <header>
+                <div class="header-info">
+                    <h2>Panel de Control</h2>
+                    <p>Monitorización en tiempo real del asistente inteligente.</p>
+                </div>
+                <div class="user-profile">
+                    <span class="v-avatar">V</span>
+                    <span class="username">Mavipi</span>
+                </div>
+            </header>
+
+            <!-- Stats Grid -->
+            <section class="stats-grid">
+                <div class="stat-card glass">
+                    <div class="stat-icon blue">📬</div>
+                    <div class="stat-data">
+                        <h3 id="stat-emails">0</h3>
+                        <p>Correos Procesados</p>
+                    </div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-icon purple">🧠</div>
+                    <div class="stat-data">
+                        <h3 id="stat-llm">Activo</h3>
+                        <p>Estado LLM (TinyLlama)</p>
+                    </div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-icon green">⚡</div>
+                    <div class="stat-data">
+                        <h3 id="stat-latency">-- ms</h3>
+                        <p>Latencia Media</p>
+                    </div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-icon orange">🔋</div>
+                    <div class="stat-data">
+                        <h3 id="stat-exchange">Conectado</h3>
+                        <p>Exchange (HUAYI)</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Live Feed -->
+            <section class="live-feed glass">
+                <div class="section-header">
+                    <h3>Actividad Reciente</h3>
+                    <span class="live-tag">LIVE</span>
+                </div>
+                <div class="feed-table-container">
+                    <table id="events-table">
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>Evento</th>
+                                <th>Detalle</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-body">
+                            <!-- Inyectado por JS -->
+                            <tr>
+                                <td colspan="4" class="empty-msg">Iniciando el motor de búsqueda...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Background Decoration -->
+    <div class="bg-gradient-orb orb-1"></div>
+    <div class="bg-gradient-orb orb-2"></div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
