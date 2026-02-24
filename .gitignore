@@ -1,0 +1,29 @@
+# Environment variables
+.env
+
+# Data and Logs
+data/
+logs/
+
+# Trained models and large files
+modelo_correos_final/
+*.pkl
+*.h5
+*.pt
+*.onnx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env/
+
+# IDEs
+.vscode/
+.idea/
+
+# Agent specific
+.agents/

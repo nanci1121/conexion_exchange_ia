@@ -1,0 +1,83 @@
+project:
+  name: "Email AI Assistant"
+  version: "1.0.0"
+  environment: "production"  # development, staging, production
+
+# Configuración del modelo
+model:
+  name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  adapter_path: "./modelo_correos_final"
+  quantization: "4bit"
+  max_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+  
+  # Configuración específica por tarea
+  tasks:
+    classification:
+      temperature: 0.1  # Más determinista
+      max_tokens: 256
+      
+    generation:
+      temperature: 0.7
+      max_tokens: 512
+      
+    summarization:
+      temperature: 0.3
+      max_tokens: 200
+
+# Conexión Exchange
+exchange:
+  server: "mail.huayicompressor.es"
+  ip: "10.192.92.24" 
+  version: "Exchange2019"
+  auth_type: "NTLM"  # o "Basic", "OAuth2"
+  username: "${EXCHANGE_USER}"
+  password: "${EXCHANGE_PASS}"
+  domain: "HUAYI" 
+  
+  folders:
+    inbox: "Bandeja de entrada"
+    processed: "Procesados_AI"
+    drafts: "Borradores_AI"
+    errors: "Errores_Procesamiento"
+    
+  polling_interval: 300  # segundos
+
+# Límites y seguridad
+limits:
+  max_emails_per_batch: 10
+  max_daily_emails: 100
+  min_confidence_threshold: 0.75
+  
+security:
+  encrypt_logs: true
+  mask_pii: true
+  require_approval_for:
+    - amount > 1000
+    - cancellation_requests
+    - legal_matters
+
+# Integraciones
+integraciones:
+  crm:
+    enabled: true
+    system: "salesforce"  # o "dynamics", "hubspot"
+    
+  ticketing:
+    enabled: true
+    system: "jira"
+    
+  analytics:
+    enabled: true
+    dashboard_url: "https://analytics.empresa.com/email-ai"
+
+# Notificaciones
+notifications:
+  admin_email: "admin@empresa.com"
+  error_webhook: "https://hooks.slack.com/services/..."
+  
+  alerts:
+    on_error: true
+    on_escalation: true
+    daily_summary: true

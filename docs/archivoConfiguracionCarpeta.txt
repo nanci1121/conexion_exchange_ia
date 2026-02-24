@@ -1,0 +1,792 @@
+ Para un proyecto de IA que conteste correos de Outlook/Exchange, necesitas una estructura profesional con archivos de reglas (rules) y flujos de trabajo (workflows). Aquí te detallo todos los archivos necesarios:
+
+---
+
+## Estructura de Carpetas Recomendada
+
+```
+proyecto_email_ai/
+├── 📁 config/                    # Configuración
+│   ├── config.yaml              # Configuración general
+│   ├── exchange.yaml            # Configuración Exchange/Outlook
+│   └── model_config.yaml        # Configuración del modelo
+│
+├── 📁 rules/                     # REGLAS DE NEGOCIO
+│   ├── email_rules.yaml         # Reglas de procesamiento de correos
+│   ├── response_rules.yaml      # Reglas de respuesta
+│   ├── security_rules.yaml      # Reglas de seguridad y filtrado
+│   └── tone_rules.yaml          # Reglas de tono y estilo
+│
+├── 📁 workflows/                 # FLUJOS DE TRABAJO
+│   ├── main_workflow.yaml       # Flujo principal
+│   ├── email_processing.yaml    # Procesamiento de entrada
+│   ├── draft_review.yaml        # Revisión de borradores
+│   └── escalation_workflow.yaml # Escalamiento humano
+│
+├── 📁 prompts/                   # PROMPTS DEL SISTEMA
+│   ├── system_prompt.txt        # Prompt base del sistema
+│   ├── email_classifier.txt     # Clasificador de correos
+│   ├── response_generator.txt   # Generador de respuestas
+│   └── quality_checker.txt      # Verificador de calidad
+│
+├── 📁 data/                      # DATOS
+│   ├── training/                # Datos de entrenamiento
+│   ├── templates/               # Plantillas de respuesta
+│   └── knowledge_base/          # Base de conocimiento
+│
+├── 📁 src/                       # CÓDIGO FUENTE
+│   ├── __init__.py
+│   ├── exchange_connector.py    # Conexión Exchange
+│   ├── email_processor.py       # Procesador de correos
+│   ├── ai_responder.py          # Módulo IA
+│   └── workflow_engine.py       # Motor de workflows
+│
+├── 📁 tests/                     # TESTS
+├── 📁 logs/                      # LOGS
+├── 📁 docs/                      # DOCUMENTACIÓN
+└── requirements.txt
+```
+
+---
+
+## Archivos de REGLAS (Rules)
+
+### 1. `rules/email_rules.yaml` - Reglas de Procesamiento
+
+```yaml
+# Reglas para decidir qué correos procesar
+email_processing_rules:
+
+  # Reglas de inclusión (qué procesar)
+  inclusion:
+    - condition: "asunto contiene ['consulta', 'pregunta', 'solicitud', 'info']"
+      priority: high
+      action: process
+      
+    - condition: "remitente dominio es '@empresa.com'"
+      priority: medium
+      action: process
+      
+    - condition: "correo es de cliente registrado"
+      priority: high
+      action: process_with_context
+
+  # Reglas de exclusión (qué ignorar)
+  exclusion:
+    - condition: "asunto contiene ['spam', 'newsletter', 'no responder']"
+      action: ignore
+      
+    - condition: "remitente está en lista_negra"
+      action: ignore_and_log
+      
+    - condition: "correo tiene adjunto ejecutable (.exe, .bat)"
+      action: quarantine
+      
+    - condition: "es correo masivo (bcc) y no es urgente"
+      action: draft_only  # Crear borrador pero no enviar
+
+  # Reglas de clasificación
+  classification:
+    urgent:
+      - "asunto contiene 'urgente'"
+      - "asunto contiene 'incidente'"
+      - "marcado como alto prioridad"
+      
+    sales:
+      - "asunto contiene ['presupuesto', 'cotización', 'precio']"
+      - "remitente es de área comercial"
+      
+    support:
+      - "asunto contiene ['error', 'problema', 'soporte', 'ayuda']"
+      - "remitente es cliente con contrato de soporte"
+      
+    internal:
+      - "remitente dominio interno '@empresa.com'"
+```
+
+### 2. `rules/response_rules.yaml` - Reglas de Respuesta
+
+```yaml
+# Reglas para generar y enviar respuestas
+response_generation_rules:
+
+  # Tiempos de respuesta según prioridad
+  response_time:
+    urgent: "15 minutos"
+    high: "2 horas"
+    normal: "24 horas"
+    low: "48 horas"
+
+  # Reglas de formato
+  formatting:
+    language: "es-ES"
+    max_length: 500  # caracteres
+    signature_required: true
+    include_greeting: true
+    include_closing: true
+    
+    structure:
+      - greeting
+      - acknowledgment
+      - body
+      - action_items
+      - closing
+      - signature
+
+  # Reglas de contenido prohibido
+  content_restrictions:
+    forbidden_phrases:
+      - "no sé"
+      - "no puedo ayudarte"
+      - "eso no es mi problema"
+      - "pregunta a otra persona"
+      
+    required_when:
+      pricing_inquiry: "incluir disclaimer legal"
+      technical_issue: "incluir número de ticket"
+      complaint: "ofrecer disculpa y solución"
+
+  # Reglas de aprobación
+  approval_required:
+    - condition: "monto mencionado > 1000€"
+      approver: "manager"
+      
+    - condition: "es queja formal"
+      approver: "customer_service_lead"
+      
+    - condition: "solicita cancelación de contrato"
+      approver: "retention_team"
+      
+    - condition: "contiene datos sensibles (DNI, tarjeta)"
+      action: "mask_before_sending"
+
+  # Plantillas por tipo
+  templates:
+    greeting_morning: "Buenos días"
+    greeting_afternoon: "Buenas tardes"
+    closing_formal: "Quedo a su disposición para cualquier consulta adicional"
+    closing_internal: "Un saludo"
+```
+
+### 3. `rules/security_rules.yaml` - Reglas de Seguridad
+
+```yaml
+# Reglas de seguridad y cumplimiento
+security_rules:
+
+  # Filtrado de datos sensibles (PII)
+  data_protection:
+    mask_patterns:
+      - regex: "\\b\\d{8}[A-Z]\\b"  # DNI español
+        replacement: "[DNI-MASKED]"
+        
+      - regex: "\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b"  # Tarjetas
+        replacement: "[CARD-MASKED]"
+        
+      - regex: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"  # Emails
+        replacement: "[EMAIL-MASKED]"
+        
+      - regex: "\\b\\d{3}[\\s-]?\\d{2}[\\s-]?\\d{4}\\b"  # SSN
+        replacement: "[SSN-MASKED]"
+
+  # Validación de salida
+  output_validation:
+    check_for:
+      - "no incluir información de otros clientes"
+      - "no revelar datos internos confidenciales"
+      - "no prometer lo que no se puede cumplir"
+      - "verificar que la firma sea correcta"
+      
+    blocked_recipients:
+      - "*@competidor.com"
+      - "*@gmail.com"  # Si solo es empresa interna
+      
+    max_daily_emails: 100  # Límite anti-spam
+
+  # Auditoría
+  audit:
+    log_all: true
+    retention_days: 365
+    encrypt_logs: true
+    log_fields:
+      - timestamp
+      - sender
+      - subject_hash  # Hash por privacidad
+      - classification
+      - response_time
+      - model_version
+      - confidence_score
+```
+
+### 4. `rules/tone_rules.yaml` - Reglas de Tono y Estilo
+
+```yaml
+# Reglas de personalidad y tono según contexto
+tone_adaptation_rules:
+
+  default_tone:
+    formality: "formal"
+    friendliness: "moderate"
+    empathy: "medium"
+    brevity: "concise"
+
+  # Adaptación por tipo de cliente
+  by_client_type:
+    vip:
+      formality: "high"
+      personalization: "use previous interactions"
+      response_time: "immediate"
+      signature: "dedicated_account_manager"
+      
+    new_lead:
+      formality: "professional"
+      enthusiasm: "high"
+      include_cta: true  # Call to action
+      
+    internal:
+      formality: "casual"
+      brevity: "very_concise"
+      skip_greeting_if_thread: true
+      
+    angry_customer:
+      empathy: "very_high"
+      apology_first: true
+      solution_focused: true
+      avoid_excuses: true
+
+  # Adaptación por canal
+  by_channel:
+    email:
+      structure: "full_formal"
+      max_paragraphs: 3
+      
+    teams_chat:
+      structure: "brief"
+      emoji_allowed: true
+      
+    ticket_system:
+      structure: "technical"
+      include_metadata: true
+
+  # Reglas lingüísticas específicas
+  language_rules:
+    es_ES:
+      use_tuteo: false  # Usar 'usted' no 'tú'
+      avoid_anglicisms: true
+      date_format: "DD/MM/YYYY"
+      currency: "EUR"
+      time_format: "24h"
+```
+
+---
+
+## Archivos de WORKFLOWS (Flujos de Trabajo)
+
+### 1. `workflows/main_workflow.yaml` - Flujo Principal
+
+```yaml
+# Workflow principal de procesamiento de correos
+workflow:
+  name: "Email AI Processor"
+  version: "1.0.0"
+  description: "Proceso completo desde recepción hasta envío/escalamiento"
+
+  triggers:
+    - type: "schedule"
+      every: "5 minutes"
+    - type: "webhook"
+      endpoint: "/new-email"
+    - type: "manual"
+      ui_button: "Procesar bandeja"
+
+  steps:
+    # Paso 1: Recepción
+    - id: "fetch_emails"
+      name: "Obtener correos de Exchange"
+      action: "exchange_connector.fetch_unread"
+      params:
+        max_emails: 10
+        folder: "inbox"
+        mark_as_read: false  # Lo marcaremos después
+      
+    # Paso 2: Pre-procesamiento
+    - id: "preprocess"
+      name: "Limpiar y extraer metadatos"
+      action: "email_processor.parse"
+      depends_on: ["fetch_emails"]
+      
+    # Paso 3: Clasificación
+    - id: "classify"
+      name: "Clasificar correo"
+      action: "ai.classify"
+      model: "tinyllama-classifier"
+      depends_on: ["preprocess"]
+      output: "category, priority, sentiment"
+      
+    # Paso 4: Decisión de ruta
+    - id: "route"
+      name: "Decidir flujo"
+      action: "router.decide"
+      depends_on: ["classify"]
+      rules: "rules/email_rules.yaml"
+      
+    # Paso 5a: Procesar con IA
+    - id: "generate_response"
+      name: "Generar respuesta"
+      action: "ai.generate"
+      model: "tinyllama-responder"
+      condition: "route.decision == 'auto_respond'"
+      depends_on: ["route"]
+      context:
+        - "email_thread"
+        - "customer_history"
+        - "knowledge_base"
+      
+    # Paso 5b: Escalar a humano
+    - id: "escalate"
+      name: "Crear ticket para humano"
+      action: "ticketing.create"
+      condition: "route.decision == 'escalate'"
+      depends_on: ["route"]
+      
+    # Paso 6: Revisión de calidad
+    - id: "quality_check"
+      name: "Verificar respuesta"
+      action: "ai.quality_check"
+      condition: "generate_response.completed"
+      depends_on: ["generate_response"]
+      checks:
+        - "grammar"
+        - "tone"
+        - "security"
+        - "accuracy"
+      
+    # Paso 7: Aprobación humana (si es necesaria)
+    - id: "human_review"
+      name: "Revisión humana"
+      action: "ui.show_draft"
+      condition: "quality_check.score < 0.9 OR rules.require_approval"
+      depends_on: ["quality_check"]
+      timeout: "4 hours"
+      on_timeout: "escalate"
+      
+    # Paso 8: Enviar
+    - id: "send"
+      name: "Enviar correo"
+      action: "exchange_connector.send"
+      condition: "quality_check.score >= 0.9 OR human_review.approved"
+      depends_on: ["quality_check", "human_review"]
+      
+    # Paso 9: Archivar
+    - id: "archive"
+      name: "Archivar conversación"
+      action: "database.archive"
+      depends_on: ["send", "escalate"]
+      
+  error_handling:
+    default:
+      action: "log_error"
+      notify: "admin@empresa.com"
+      
+    on_classification_fail:
+      action: "escalate_to_human"
+      
+    on_send_fail:
+      action: "retry"
+      max_retries: 3
+      backoff: "exponential"
+```
+
+### 2. `workflows/email_processing.yaml` - Procesamiento Detallado
+
+```yaml
+# Sub-workflow: Procesamiento de un correo individual
+workflow:
+  name: "Single Email Processing"
+  
+  input:
+    email_id: "string"
+    raw_content: "string"
+    metadata: "object"
+
+  steps:
+    # Extracción de información
+    - id: "extract_entities"
+      name: "Extraer entidades nombradas"
+      action: "nlp.extract_entities"
+      extract:
+        - "person_names"
+        - "organizations"
+        - "dates"
+        - "amounts"
+        - "product_names"
+        - "ticket_numbers"
+      
+    # Análisis de sentimiento
+    - id: "sentiment_analysis"
+      name: "Analizar sentimiento"
+      action: "nlp.sentiment"
+      classify:
+        - "very_negative"  # Requiere atención especial
+        - "negative"
+        - "neutral"
+        - "positive"
+        - "very_positive"
+      
+    # Detección de intención
+    - id: "intent_detection"
+      name: "Detectar intención del cliente"
+      action: "nlp.intent"
+      possible_intents:
+        - "request_information"
+        - "complaint"
+        - "compliment"
+        - "urgent_request"
+        - "cancellation"
+        - "payment_issue"
+        - "technical_support"
+      
+    # Búsqueda en base de conocimiento
+    - id: "kb_search"
+      name: "Buscar información relevante"
+      action: "knowledge_base.search"
+      query: "intent + entities"
+      top_k: 3
+      
+    # Contexto del cliente
+    - id: "customer_context"
+      name: "Obtener historial del cliente"
+      action: "crm.get_context"
+      using: "email_from_address"
+      include:
+        - "previous_tickets"
+        - "purchase_history"
+        - "satisfaction_score"
+        - "preferred_language"
+      
+  output:
+    processed_email:
+      original: "{{input.raw_content}}"
+      entities: "{{extract_entities.result}}"
+      sentiment: "{{sentiment_analysis.result}}"
+      intent: "{{intent_detection.result}}"
+      kb_articles: "{{kb_search.results}}"
+      customer_profile: "{{customer_context.result}}"
+      suggested_priority: "auto_calculated"
+```
+
+### 3. `workflows/draft_review.yaml` - Revisión de Borradores
+
+```yaml
+# Workflow para revisión humana de borradores
+workflow:
+  name: "Draft Review Process"
+  
+  input:
+    draft_id: "string"
+    draft_content: "string"
+    original_email: "object"
+    ai_confidence: "float"
+
+  steps:
+    # Notificación
+    - id: "notify_reviewer"
+      name: "Notificar al revisor"
+      action: "notifications.send"
+      to: "{{rules.get_reviewer(original_email)}}"
+      channels:
+        - "email"
+        - "teams"
+      content: "Nuevo borrador pendiente de revisión"
+      
+    # Mostrar en UI
+    - id: "present_draft"
+      name: "Mostrar en interfaz de revisión"
+      action: "ui.render_review_screen"
+      components:
+        - "original_email"
+        - "ai_draft"
+        - "edit_tools"
+        - "approve_reject_buttons"
+        - "suggestions_panel"
+      
+    # Esperar acción humana
+    - id: "await_decision"
+      name: "Esperar decisión del revisor"
+      action: "state.wait_for_input"
+      timeout: "4 hours"
+      options:
+        - "approve"
+        - "reject"
+        - "edit_and_approve"
+        - "escalate"
+        
+    # Si edita, guardar versión
+    - id: "save_edited_version"
+      name: "Guardar versión editada"
+      action: "database.save"
+      condition: "await_decision.choice == 'edit_and_approve'"
+      
+    # Si rechaza, analizar por qué
+    - id: "analyze_rejection"
+      name: "Analizar motivo de rechazo"
+      action: "learning.log_feedback"
+      condition: "await_decision.choice == 'reject'"
+      for_improvement: true
+      
+    # Métricas
+    - id: "track_metrics"
+      name: "Registrar métricas de revisión"
+      action: "analytics.track"
+      metrics:
+        - "time_to_review"
+        - "edit_distance"  # Cuánto cambió el humano
+        - "approval_rate"
+        - "rejection_reasons"
+```
+
+### 4. `workflows/escalation_workflow.yaml` - Escalamiento
+
+```yaml
+# Workflow cuando la IA no puede resolver
+workflow:
+  name: "Human Escalation"
+  
+  triggers:
+    - "confidence_score < 0.7"
+    - "sentiment == 'very_negative'"
+    - "intent == 'cancellation'"
+    - "category == 'legal_issue'"
+    - "contains_sensitive_data == true"
+
+  steps:
+    # Crear ticket
+    - id: "create_ticket"
+      name: "Crear ticket en sistema"
+      action: "ticketing.create"
+      system: "jira"  # o ServiceNow, Zendesk, etc.
+      fields:
+        summary: "{{email.subject}}"
+        description: "{{email.body}}"
+        priority: "{{calculated_priority}}"
+        labels: ["ai-escalated", "{{email.category}}"]
+        
+    # Asignar a agente
+    - id: "assign_agent"
+      name: "Asignar al mejor agente"
+      action: "routing.assign"
+      strategy: "round_robin"  # o "skill_based", "load_balanced"
+      consider:
+        - "agent_skills"
+        - "current_workload"
+        - "language"
+        - "previous_interactions_with_customer"
+        
+    # Preparar contexto para humano
+    - id: "prepare_context"
+      name: "Preparar resumen para agente"
+      action: "ai.summarize"
+      include:
+        - "email_thread_summary"
+        - "customer_history"
+        - "suggested_response"  # Lo que la IA habría dicho
+        - "why_escalated"
+        - "relevant_kb_articles"
+        
+    # Notificar
+    - id: "notify_agent"
+      name: "Notificar al agente asignado"
+      action: "notifications.send"
+      urgency: "high"
+      
+    # Auto-respuesta al cliente
+    - id: "send_acknowledgment"
+      name: "Enviar acuse de recibo"
+      action: "email.send_template"
+      template: "escalation_acknowledgment"
+      personalize: true
+      inform:
+        - "ticket_number"
+        - "expected_response_time"
+        - "assigned_agent_name"
+        
+    # Seguimiento
+    - id: "schedule_followup"
+      name: "Programar seguimiento"
+      action: "scheduler.create"
+      if_not_resolved_in: "2 hours"
+      action: "notify_supervisor"
+```
+
+---
+
+## Archivos de PROMPTS
+
+### `prompts/system_prompt.txt`
+
+```text
+Eres un asistente de correo profesional para [Nombre Empresa]. Tu objetivo es ayudar a responder correos de manera eficiente, profesional y útil.
+
+REGLAS FUNDAMENTALES:
+1. Siempre usa español formal (usted) salvo indicación contraria
+2. Mantén las respuestas concisas (máximo 3 párrafos)
+3. Nunca inventes información que no esté en el contexto
+4. Si no sabes algo, indica que escalarás a un humano
+5. Nunca incluyas datos sensibles de otros clientes
+
+ESTRUCTURA DE RESPUESTA:
+1. Saludo personalizado
+2. Reconocimiento de la consulta/problema
+3. Respuesta/solución o próximos pasos
+4. Cierre profesional
+
+CONTEXTO DISPONIBLE:
+- Historial del cliente: {{customer_history}}
+- Artículos relevantes: {{kb_articles}}
+- Intención detectada: {{intent}}
+- Sentimiento: {{sentiment}}
+
+Recuerda: Representas a la empresa. Sé cortés, profesional y solucionador.
+```
+
+### `prompts/email_classifier.txt`
+
+```text
+Clasifica el siguiente correo electrónico en una de estas categorías:
+- CONSULTA_GENERAL
+- SOPORTE_TECNICO
+- VENTAS_PRESUPUESTO
+- QUEJA_RECLAMACION
+- FACTURACION_PAGO
+- CANCELACION_BAJA
+- FELICITACION
+- URGENTE_CRITICO
+
+Además, determina:
+- Prioridad: BAJA, MEDIA, ALTA, CRITICA
+- Sentimiento: MUY_NEGATIVO, NEGATIVO, NEUTRO, POSITIVO, MUY_POSITIVO
+- Necesita aprobación humana: SI/NO
+
+Responde SOLO en formato JSON:
+{
+  "categoria": "",
+  "prioridad": "",
+  "sentimiento": "",
+  "necesita_aprobacion": "",
+  "razon": "breve explicación"
+}
+
+Correo a clasificar:
+De: {{sender}}
+Asunto: {{subject}}
+Contenido: {{body}}
+```
+
+---
+
+## Archivo de Configuración Principal (`config/config.yaml`)
+
+```yaml
+project:
+  name: "Email AI Assistant"
+  version: "1.0.0"
+  environment: "production"  # development, staging, production
+
+# Configuración del modelo
+model:
+  name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  adapter_path: "./modelo_correos_final"
+  quantization: "4bit"
+  max_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+  
+  # Configuración específica por tarea
+  tasks:
+    classification:
+      temperature: 0.1  # Más determinista
+      max_tokens: 256
+      
+    generation:
+      temperature: 0.7
+      max_tokens: 512
+      
+    summarization:
+      temperature: 0.3
+      max_tokens: 200
+
+# Conexión Exchange
+exchange:
+  server: "mail.empresa.com"
+  version: "Exchange2016"
+  auth_type: "NTLM"  # o "Basic", "OAuth2"
+  username: "${EXCHANGE_USER}"
+  password: "${EXCHANGE_PASS}"
+  domain: "EMPRESA"
+  
+  folders:
+    inbox: "Bandeja de entrada"
+    processed: "Procesados_AI"
+    drafts: "Borradores_AI"
+    errors: "Errores_Procesamiento"
+    
+  polling_interval: 300  # segundos
+
+# Límites y seguridad
+limits:
+  max_emails_per_batch: 10
+  max_daily_emails: 100
+  min_confidence_threshold: 0.75
+  
+security:
+  encrypt_logs: true
+  mask_pii: true
+  require_approval_for:
+    - amount > 1000
+    - cancellation_requests
+    - legal_matters
+
+# Integraciones
+integrations:
+  crm:
+    enabled: true
+    system: "salesforce"  # o "dynamics", "hubspot"
+    
+  ticketing:
+    enabled: true
+    system: "jira"
+    
+  analytics:
+    enabled: true
+    dashboard_url: "https://analytics.empresa.com/email-ai"
+
+# Notificaciones
+notifications:
+  admin_email: "admin@empresa.com"
+  error_webhook: "https://hooks.slack.com/services/..."
+  
+  alerts:
+    on_error: true
+    on_escalation: true
+    daily_summary: true
+```
+
+---
+
+## Resumen de Archivos Esenciales
+
+| Tipo | Archivo | Propósito |
+|------|---------|-----------|
+| **Rules** | `email_rules.yaml` | Qué correos procesar/ignorar |
+| **Rules** | `response_rules.yaml` | Cómo formatear respuestas |
+| **Rules** | `security_rules.yaml` | Protección de datos y auditoría |
+| **Rules** | `tone_rules.yaml` | Personalidad según contexto |
+| **Workflows** | `main_workflow.yaml` | Proceso completo paso a paso |
+| **Workflows** | `email_processing.yaml` | Análisis detallado de correos |
+| **Workflows** | `draft_review.yaml` | Revisión humana |
+| **Workflows** | `escalation_workflow.yaml` | Cuando falla la IA |
+| **Prompts** | `system_prompt.txt` | Instrucciones base del modelo |
+| **Prompts** | `email_classifier.txt` | Clasificación de correos |
+| **Config** | `config.yaml` | Configuración general del sistema |
+
+¿Necesitas que profundice en algún archivo específico o que te ayude a implementar la integración con Exchange on-premise?
