@@ -7,8 +7,8 @@ import time
 # Asegurar que el directorio 'src' esté en el path para las importaciones
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from .exchange_connector import test_connection, get_paginated_emails, get_email_details
-from .database import init_db, upsert_email, update_email_status, delete_email_db, get_db_connection
+from ..infrastructure.exchange.connector import test_connection, get_paginated_emails, get_email_details
+from ..infrastructure.database.postgres import init_db, upsert_email, update_email_status, delete_email_db, get_db_connection
 
 logger = logging.getLogger("WorkflowEngine")
 
@@ -36,12 +36,22 @@ def main_loop(state_ref):
         state_ref["status"] = "Error de Conexión"
         state_ref["last_error"] = "No se pudo conectar a Exchange"
 
-    from .ai_responder import AIResponder
+    from ..domain.ai.responder import AIResponder
     ai = AIResponder()
 
     try:
         while True:
-            if state_ref["exchange_connected"]:
+            # Si no estamos conectados, intentar conectar antes de procesar
+            if not state_ref.get("exchange_connected", False):
+                state_ref["status"] = "Intentando re-conexión..."
+                if test_connection():
+                    state_ref["exchange_connected"] = True
+                    state_ref["status"] = "Conexión Recuperada"
+                else:
+                    state_ref["exchange_connected"] = False
+                    state_ref["status"] = "Error de Conexión (Re-intentando)"
+
+            if state_ref.get("exchange_connected", False):
                 state_ref["status"] = "Sincronizando Inbox..."
                 
                 # 1. Obtener los correos más recientes de Exchange (Inbox)
@@ -76,7 +86,7 @@ def main_loop(state_ref):
                     conn = get_db_connection()
                     if conn:
                         cur = conn.cursor()
-                        cur.execute("SELECT id FROM emails WHERE (body = '' OR body IS NULL) LIMIT 10")
+                        cur.execute("SELECT id FROM emails WHERE (body = '' OR body IS NULL) LIMIT 50")
                         missing = cur.fetchall()
                         cur.close()
                         conn.close()

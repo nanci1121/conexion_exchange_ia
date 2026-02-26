@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.Python
+.venv
+venv
+ENV
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+logs/
+temp_uploads/
+.env.local
+
+# Large model files (use volumes instead)
+modelo_correos_final/ 
+
+# Tests (run in container or separately)
+tests/
+
+# Documentation
+docs/
+README_WSL_DOCKER.md

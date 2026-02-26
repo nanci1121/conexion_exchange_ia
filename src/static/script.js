@@ -21,6 +21,12 @@ async function updateStatus() {
 
         document.getElementById('stat-latency').innerText = Math.floor(Math.random() * (120 - 80) + 80) + ' ms';
 
+        // Actualizar Cabecera con Usuario
+        const userEmail = data.exchange_user || 'Usuario';
+        const userName = userEmail.split('@')[0].split('.')[0];
+        document.getElementById('user-name').innerText = userName.charAt(0).toUpperCase() + userName.slice(1);
+        document.getElementById('user-avatar').innerText = userEmail.charAt(0).toUpperCase();
+
         // Sección de Foco
         const focusSection = document.getElementById('focus-section');
         if (data.current_email) {
@@ -206,12 +212,127 @@ document.querySelectorAll('nav a').forEach(link => {
         link.classList.add('active');
 
         const tabName = link.innerText.trim();
-        if (tabName === 'Correos') {
+
+        // Ocultar todas las secciones principales
+        document.querySelector('.stats-grid').style.display = 'none';
+        document.querySelector('.live-feed').style.display = 'none';
+        document.getElementById('settings-section').style.display = 'none';
+        document.getElementById('knowledge-section').style.display = 'none';
+
+        if (tabName === 'Dashboard') {
+            document.querySelector('.stats-grid').style.display = 'grid';
+            document.querySelector('.live-feed').style.display = 'block';
+        } else if (tabName === 'Correos') {
+            document.querySelector('.stats-grid').style.display = 'grid';
+            document.querySelector('.live-feed').style.display = 'block';
             currentPage = 0;
             fetchEmails();
+        } else if (tabName === 'Conocimiento') {
+            document.getElementById('knowledge-section').style.display = 'block';
+            loadKnowledge();
+        } else if (tabName === 'Ajustes') {
+            document.getElementById('settings-section').style.display = 'block';
+            loadSettings();
         }
     });
 });
+
+async function loadKnowledge() {
+    const listBody = document.getElementById('knowledge-body');
+    if (!listBody) return;
+    
+    try {
+        const response = await fetch('/api/knowledge');
+        const data = await response.json();
+        
+        listBody.innerHTML = '';
+        if (data.length === 0) {
+            listBody.innerHTML = '<tr><td colspan="3" class="empty-msg">No hay documentos indexados.</td></tr>';
+            return;
+        }
+        
+        data.forEach(doc => {
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid var(--glass-border)';
+            row.innerHTML = `
+                <td style="padding: 12px; font-size: 14px;">📄 ${doc.filename}</td>
+                <td style="padding: 12px; font-size: 14px; color: var(--text-dim);">${doc.created_at}</td>
+                <td style="padding: 12px; font-size: 14px;"><span style="color: var(--accent-blue); cursor: pointer;">🔍 Ver</span></td>
+            `;
+            listBody.appendChild(row);
+        });
+    } catch (e) {
+        listBody.innerHTML = '<tr><td colspan="3" class="empty-msg">Error al cargar conocimiento.</td></tr>';
+    }
+}
+
+async function handleFileUpload(file) {
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const dropZone = document.getElementById('drop-zone');
+    const originalContent = dropZone.innerHTML;
+    dropZone.innerHTML = `<h4>Procesando e Indexando...</h4><p>${file.name}</p><div class="processing-loader" style="margin: 10px auto;"></div>`;
+    
+    try {
+        const response = await fetch('/api/knowledge/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        alert(result.message);
+        loadKnowledge();
+    } catch (e) {
+        alert('Error al subir el archivo');
+    } finally {
+        dropZone.innerHTML = originalContent;
+    }
+}
+
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+
+        document.getElementById('setting-ex-user').value = data.exchange_user || '';
+        document.getElementById('setting-ex-server').value = data.exchange_server || '';
+        document.getElementById('setting-ex-upn').value = data.exchange_upn || '';
+        document.getElementById('setting-ai-threads').value = data.ai_threads || 4;
+        document.getElementById('setting-ai-temp').value = data.ai_temp || 0.1;
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function handleSaveConfig() {
+    const user = document.getElementById('setting-ex-user').value;
+    const server = document.getElementById('setting-ex-server').value;
+    const upn = document.getElementById('setting-ex-upn').value;
+    const pass = document.getElementById('setting-ex-pass').value;
+    const threads = parseInt(document.getElementById('setting-ai-threads').value);
+    const temp = parseFloat(document.getElementById('setting-ai-temp').value);
+
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                exchange_user: user,
+                exchange_server: server,
+                exchange_upn: upn,
+                exchange_pass: (pass && pass !== "••••••••") ? pass : null,
+                ai_threads: threads,
+                ai_temp: temp
+            })
+        });
+        const data = await response.json();
+        alert(data.message);
+    } catch (e) {
+        alert('Error al guardar la configuración');
+    }
+}
 
 setInterval(updateStatus, 5000);
 updateStatus();

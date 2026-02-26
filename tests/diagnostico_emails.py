@@ -1,4 +1,4 @@
-from src.exchange_connector import get_account
+from src.infrastructure.exchange.connector import get_account
 import logging
 
 logging.basicConfig(level=logging.INFO)

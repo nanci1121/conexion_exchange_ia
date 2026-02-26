@@ -29,6 +29,17 @@ def init_db():
     
     try:
         cur = conn.cursor()
+        # Habilitar extensión pgvector si no existe
+        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        
+        # Crear tabla de ajustes si no existe
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+        """)
         # Crear tabla de correos si no existe
         cur.execute("""
             CREATE TABLE IF NOT EXISTS emails (
@@ -41,6 +52,18 @@ def init_db():
                 ai_response TEXT,
                 status TEXT DEFAULT 'PENDIENTE',
                 processed_at TIMESTAMP
+            );
+        """)
+        # Crear tabla de documentos de conocimiento (RAG)
+        # 384 dimensiones es el estándar para el modelo all-MiniLM-L6-v2 que usaremos
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS documents (
+                id SERIAL PRIMARY KEY,
+                filename TEXT,
+                content TEXT,
+                embedding vector(384),
+                metadata JSONB,
+                created_at TIMESTAMP DEFAULT NOW()
             );
         """)
         conn.commit()
@@ -188,6 +211,7 @@ def get_email_detail_db(email_id):
     except Exception as e:
         logger.error(f"Error obteniendo detalle de DB: {e}")
         return None
+
 def delete_email_db(email_id):
     conn = get_db_connection()
     if not conn:
@@ -202,3 +226,51 @@ def delete_email_db(email_id):
     except Exception as e:
         logger.error(f"Error eliminando de DB: {e}")
         return False
+
+# --- Gestión de Ajustes ---
+
+def save_setting(key, value):
+    conn = get_db_connection()
+    if not conn: return
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO settings (key, value, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_at = EXCLUDED.updated_at;
+        """, (key, str(value)))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error guardando ajuste {key}: {e}")
+
+def get_setting(key, default=None):
+    conn = get_db_connection()
+    if not conn: return default
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
+        res = cur.fetchone()
+        cur.close()
+        conn.close()
+        return res[0] if res else default
+    except Exception as e:
+        logger.error(f"Error obteniendo ajuste {key}: {e}")
+        return default
+
+def get_all_settings():
+    conn = get_db_connection()
+    if not conn: return {}
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT key, value FROM settings")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {r['key']: r['value'] for r in rows}
+    except Exception as e:
+        logger.error(f"Error obteniendo todos los ajustes: {e}")
+        return {}

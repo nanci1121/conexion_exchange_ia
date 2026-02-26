@@ -448,6 +448,48 @@ td {
     transform: scale(1.02);
 }
 
+.glass-input {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 10px 15px;
+    color: white;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.glass-input:focus {
+    border-color: var(--accent-blue);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.glass-input[readonly] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.password-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 18px;
+    transition: color 0.3s ease;
+    user-select: none;
+}
+
+.toggle-password:hover {
+    color: var(--accent-blue);
+}
+
 /* Background Orbs */
 .bg-gradient-orb {
     position: fixed;

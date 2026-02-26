@@ -28,7 +28,7 @@ model:
 
 # Conexión Exchange
 exchange:
-  server: "mail.huayicompressor.es"
+  server: "${EXCHANGE_SERVER}"
   ip: "10.192.92.24" 
   version: "Exchange2019"
   auth_type: "NTLM"  # o "Basic", "OAuth2"

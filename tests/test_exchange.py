@@ -5,7 +5,7 @@ import pytest
 # Añadir el directorio raíz al path para poder importar desde src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.exchange_connector import test_connection
+from src.infrastructure.exchange.connector import test_connection
 
 def test_exchange_connection():
     """
