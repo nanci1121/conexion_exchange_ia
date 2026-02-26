@@ -86,6 +86,7 @@ body {
 .logo h1 span {
     background: linear-gradient(to right, var(--accent-blue), var(--accent-purple));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -108,7 +109,8 @@ nav a {
     font-weight: 500;
 }
 
-nav a.active, nav a:hover {
+nav a.active,
+nav a:hover {
     background: rgba(255, 255, 255, 0.05);
     color: var(--text-main);
 }
@@ -139,9 +141,48 @@ nav a.active {
 }
 
 @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.processing-loader {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(157, 80, 187, 0.2);
+    border-top: 3px solid var(--accent-purple);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Main Content */
@@ -223,10 +264,25 @@ header {
     font-size: 22px;
 }
 
-.stat-icon.blue { background: rgba(0, 210, 255, 0.1); border: 1px solid rgba(0, 210, 255, 0.2); }
-.stat-icon.purple { background: rgba(157, 80, 187, 0.1); border: 1px solid rgba(157, 80, 187, 0.2); }
-.stat-icon.green { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); }
-.stat-icon.orange { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); }
+.stat-icon.blue {
+    background: rgba(0, 210, 255, 0.1);
+    border: 1px solid rgba(0, 210, 255, 0.2);
+}
+
+.stat-icon.purple {
+    background: rgba(157, 80, 187, 0.1);
+    border: 1px solid rgba(157, 80, 187, 0.2);
+}
+
+.stat-icon.green {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.stat-icon.orange {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
 
 .stat-data h3 {
     font-size: 22px;
@@ -294,8 +350,103 @@ td {
     font-weight: 600;
 }
 
-.status-label.success { background: rgba(34, 197, 94, 0.1); color: var(--success); }
-.status-label.info { background: rgba(0, 210, 255, 0.1); color: var(--accent-blue); }
+.status-label.success {
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--success);
+}
+
+.status-label.info {
+    background: rgba(0, 210, 255, 0.1);
+    color: var(--accent-blue);
+}
+
+.status-label.danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+.status-label.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+}
+
+/* --- Email Detail Modal --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.modal-content {
+    background: var(--primary-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    width: 600px;
+    max-width: 90%;
+    max-height: 80vh;
+    padding: 30px;
+    overflow-y: auto;
+    box-shadow: 0 50px 100px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 15px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.btn-primary {
+    background: var(--accent-blue);
+    color: #000;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+.unread {
+    border-left: 4px solid var(--accent-blue);
+    background: rgba(0, 210, 255, 0.05);
+}
+
+.btn:hover {
+    opacity: 0.9;
+    transform: scale(1.02);
+}
 
 /* Background Orbs */
 .bg-gradient-orb {

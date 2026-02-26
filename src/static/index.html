@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body class="dark-theme">
     <div class="glass-container">
         <!-- Sidebar -->
@@ -74,6 +76,20 @@
                 </div>
             </section>
 
+            <!-- Active Focus Section -->
+            <section id="focus-section" class="glass"
+                style="display: none; margin-bottom: 30px; padding: 20px; border-left: 4px solid var(--accent-purple); animation: slideIn 0.5s ease-out;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <span class="status-label warning"
+                            style="margin-bottom: 10px; display: inline-block;">PROCESANDO AHORA</span>
+                        <h3 id="focus-subject" style="font-size: 20px; margin-bottom: 5px;">-</h3>
+                        <p id="focus-sender" style="color: var(--text-dim); font-size: 14px;">-</p>
+                    </div>
+                    <div class="processing-loader"></div>
+                </div>
+            </section>
+
             <!-- Live Feed -->
             <section class="live-feed glass">
                 <div class="section-header">
@@ -81,25 +97,75 @@
                     <span class="live-tag">LIVE</span>
                 </div>
                 <div class="feed-table-container">
-                    <table id="events-table">
+                    <table id="emails-table">
                         <thead>
                             <tr>
-                                <th>Hora</th>
-                                <th>Evento</th>
-                                <th>Detalle</th>
+                                <th>Fecha</th>
+                                <th>Remitente</th>
+                                <th>Asunto</th>
                                 <th>Estado</th>
                             </tr>
                         </thead>
-                        <tbody id="events-body">
-                            <!-- Inyectado por JS -->
+                        <tbody id="emails-body">
                             <tr>
-                                <td colspan="4" class="empty-msg">Iniciando el motor de búsqueda...</td>
+                                <td colspan="4" class="empty-msg">Selecciona "Correos" para ver tu bandeja.</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+                <!-- Pagination Controls -->
+                <div class="pagination-container"
+                    style="display:flex; justify-content:center; gap:20px; margin-top:20px;">
+                    <button id="prev-page" class="btn btn-secondary" onclick="changePage(-1)">Anterior</button>
+                    <span id="page-info" style="align-self:center; color:var(--text-dim);">Página 1</span>
+                    <button id="next-page" class="btn btn-secondary" onclick="changePage(1)">Siguiente</button>
+                </div>
             </section>
         </main>
+    </div>
+
+    <!-- Modal de Detalle de Correo -->
+    <div id="email-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-subject">Asunto del Correo</h3>
+                <p id="modal-sender" style="color: var(--text-dim); margin-top:5px; font-size:14px;"></p>
+            </div>
+            <div id="modal-body"
+                style="margin-bottom: 25px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; max-height: 400px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 12px; font-family: 'Inter', sans-serif; color: #e0e0e0; border: 1px solid rgba(255,255,255,0.05);">
+            </div>
+
+            <div style="border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                    <h4 style="color: var(--accent-blue); margin: 0; font-size: 14px;">Idioma:</h4>
+                    <select id="language-selector"
+                        style="background: rgba(0,0,0,0.3); color: white; border: 1px solid var(--glass-border); border-radius: 6px; padding: 5px 10px; font-size: 13px;">
+                        <option value="es">Español</option>
+                        <option value="en">Inglés</option>
+                        <option value="both">Ambos (ES + EN)</option>
+                    </select>
+                </div>
+
+                <h4 style="color: var(--accent-blue); margin-bottom: 8px; font-size: 14px;">Instrucciones para la IA
+                    (Prompt):</h4>
+                <textarea id="custom-prompt" placeholder="Ej: Dile que sí pero que solo puedo el martes..."
+                    style="width:100%; height:60px; background: rgba(0,0,0,0.2); color: white; border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; margin-bottom: 15px; resize: none;"></textarea>
+
+                <h4 style="color: var(--accent-purple); margin-bottom: 8px; font-size: 14px;">Respuesta sugerida:</h4>
+                <div id="modal-ai-response"
+                    style="background: rgba(157, 80, 187, 0.05); padding: 15px; border-radius: 10px; font-style: italic; min-height: 40px; white-space: pre-wrap; font-size: 14px;">
+                </div>
+            </div>
+
+            <div class="modal-actions" style="flex-wrap: wrap; margin-top: 20px;">
+                <button id="btn-generate" class="btn btn-primary" onclick="handleGenerateAI()">Generar con IA</button>
+                <button id="btn-save-draft" class="btn btn-secondary" onclick="handleSaveDraft()"
+                    style="background: var(--success); color: white; display: none;">Guardar en Borradores</button>
+                <button class="btn btn-secondary" onclick="handleMarkRead()">Leído</button>
+                <button class="btn btn-danger" onclick="handleDelete()">Eliminar</button>
+                <button class="btn btn-secondary" style="margin-left: auto;" onclick="closeModal()">Cerrar</button>
+            </div>
+        </div>
     </div>
 
     <!-- Background Decoration -->
@@ -108,4 +174,5 @@
 
     <script src="/static/script.js"></script>
 </body>
+
 </html>

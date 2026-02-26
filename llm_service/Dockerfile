@@ -18,8 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Creamos directorio para el modelo si no existe
 RUN mkdir -p /app/models
 
-# Script de descarga del modelo GGUF (TinyLlama es ideal por tamaño y velocidad)
-RUN wget -O /app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+# Llama-3.2-3B es mucho más potente y tiene mejor manejo de instrucciones que TinyLlama
+RUN wget -O /app/models/llama-3.2-3b-instruct-q4_k_m.gguf https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
 
 COPY . .
 

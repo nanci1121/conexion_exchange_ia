@@ -1,7 +1,7 @@
 import os
 import yaml
 import logging
-from exchangelib import Credentials, Account, Configuration, DELEGATE, protocol
+from exchangelib import Credentials, Account, Configuration, DELEGATE, protocol, Message, Mailbox
 from dotenv import load_dotenv
 
 # Desactivar verificación SSL si es necesario (común en entornos internos)
@@ -39,28 +39,152 @@ def test_connection():
         print(f"❌ Error de conexión: {str(e)}")
         return False
 
-def get_latest_emails(count=10):
+def get_paginated_emails(offset=0, limit=10):
     """
-    Recupera los últimos correos sin leer.
+    Recupera correos de la bandeja de entrada con paginación.
     """
     try:
         account = get_account()
-        # Filtrar por no leídos y ordenar por fecha
-        emails = account.inbox.filter(is_read=False).order_by('-datetime_received')[:count]
+        # Solo pedimos los campos necesarios para la lista, evitando el 'body' que es lo más pesado
+        query = account.inbox.all().only(
+            'subject', 'sender', 'datetime_received', 'is_read'
+        ).order_by('-datetime_received')
+        
+        # El conteo lo hacemos sobre el query optimizado
+        total_count = query.count()
+        emails = query[offset:offset+limit]
         
         results = []
         for item in emails:
             results.append({
-                "id": str(item.message_id),
+                "id": str(item.id) if item.id else str(item.message_id),
                 "subject": item.subject,
-                "sender": item.sender.email_address,
+                "sender": item.sender.email_address if item.sender else "Sistema",
                 "date": item.datetime_received.strftime("%Y-%m-%d %H:%M:%S"),
-                "body": item.body[:1000] + "..." if item.body else ""
+                "is_read": item.is_read,
+                "body_preview": "" # Ya no lo cargamos aquí para ganar velocidad
             })
-        return results
+        return {"emails": results, "total": total_count}
     except Exception as e:
-        print(f"Error recuperando emails: {str(e)}")
-        return []
+        print(f"Error recuperando emails paginados: {str(e)}")
+        return {"emails": [], "total": 0}
+
+def clean_html(html_content):
+    if not html_content:
+        return ""
+    import re
+    # Asegurar que es string
+    text = str(html_content)
+    # Eliminar etiquetas script y style
+    text = re.sub(r'<(script|style).*?>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    # Reemplazar <br> y </p> con saltos de línea para mantener estructura
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p>', '\n', text, flags=re.IGNORECASE)
+    # Eliminar todas las etiquetas restantes
+    text = re.sub(r'<.*?>', '', text)
+    # Decodificar entidades comunes
+    text = text.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+    
+    cleaned = text.strip()
+    # Si después de limpiar no queda nada pero el original tenía contenido, devolvemos el original truncado o similar
+    if not cleaned and len(str(html_content)) > 10:
+        return str(html_content)[:1000] # Fallback de seguridad
+    return cleaned
+
+def get_email_details(item_id):
+    """
+    Obtiene el cuerpo completo de un correo específico.
+    """
+    try:
+        account = get_account()
+        item = account.inbox.get(id=item_id)
+        
+        # Intentamos obtener el cuerpo de texto, si no, limpiamos el HTML
+        body_content = item.text_body if item.text_body else clean_html(item.body)
+        
+        return {
+            "id": str(item.id),
+            "subject": item.subject,
+            "sender": item.sender.email_address if item.sender else "Sistema",
+            "body": body_content,
+            "date": item.datetime_received.strftime("%Y-%m-%d %H:%M:%S")
+        }
+    except Exception as e:
+        print(f"Error obteniendo detalle: {str(e)}")
+        return None
+
+def save_draft(item_id, body_response):
+    """
+    Crea una respuesta en borradores vinculada al correo original.
+    """
+    try:
+        account = get_account()
+        item = account.inbox.get(id=item_id)
+        # Creamos una respuesta pero en lugar de .send(), usamos .save() en la carpeta Drafts
+        reply = item.create_reply(
+            subject=f"RE: {item.subject}",
+            body=body_response
+        )
+        reply.save(account.drafts)
+        return True
+    except Exception as e:
+        print(f"Error guardando borrador: {str(e)}")
+        return False
+
+def send_email(to_email, subject, body, item_id=None):
+    """
+    Envía un nuevo correo o una respuesta.
+    """
+    try:
+        account = get_account()
+        if item_id:
+            # Es una respuesta (simplificado, en producción buscaríamos el item original)
+            item = account.inbox.get(id=item_id)
+            item.reply(
+                subject=f"RE: {item.subject}",
+                body=body
+            )
+        else:
+            # Nuevo correo
+            m = Message(
+                account=account,
+                folder=account.sent,
+                subject=subject,
+                body=body,
+                to_recipients=[Mailbox(email_address=to_email)]
+            )
+            m.send()
+        return True
+    except Exception as e:
+        print(f"Error enviando email: {str(e)}")
+        return False
+
+def mark_as_read(item_id, read=True):
+    """
+    Marca un correo como leído o no leído.
+    """
+    try:
+        account = get_account()
+        item = account.inbox.get(id=item_id)
+        item.is_read = read
+        item.save(update_fields=['is_read'])
+        return True
+    except Exception as e:
+        print(f"Error marcando como leído: {str(e)}")
+        return False
+
+def delete_email(item_id):
+    """
+    Mueve un correo a la papelera.
+    """
+    try:
+        account = get_account()
+        item = account.inbox.get(id=item_id)
+        item.move_to_trash()
+        return True
+    except Exception as e:
+        print(f"Error eliminando email: {str(e)}")
+        return False
 
 if __name__ == "__main__":
     test_connection()

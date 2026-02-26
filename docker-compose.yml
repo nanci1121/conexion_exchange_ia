@@ -21,11 +21,13 @@ services:
     container_name: email_ai_llm
     environment:
       - PYTHONUNBUFFERED=1
-      - CPU_THREADS=2
+      - CPU_THREADS=4
     volumes:
       # Montamos la carpeta del modelo final; asegúrate de que exista la ruta
       - ./modelo_correos_final:/app/modelo_correos_final
       - hf_cache:/root/.cache/huggingface
+      # Montar app.py para poder editar sin rebuild
+      - ./llm_service/app.py:/app/app.py
     ports:
       - "8000:8000"
     # Descomenta las siguientes líneas si tienes NVIDIA Container Toolkit instalado en WSL

@@ -19,7 +19,7 @@ model:
       max_tokens: 256
       
     generation:
-      temperature: 0.7
+      temperature: 0.1  # Muy bajo para evitar invenciones (alucinaciones)
       max_tokens: 512
       
     summarization:

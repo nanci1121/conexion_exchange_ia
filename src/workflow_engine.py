@@ -2,22 +2,26 @@ import asyncio
 import logging
 import os
 import sys
+import time
 
 # Asegurar que el directorio 'src' esté en el path para las importaciones
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from .exchange_connector import test_connection
+from .exchange_connector import test_connection, get_paginated_emails, get_email_details
+from .database import init_db, upsert_email, update_email_status, delete_email_db, get_db_connection
 
 logger = logging.getLogger("WorkflowEngine")
 
 def main_loop(state_ref):
     """
     Loop principal de procesamiento.
-    Recibe una referencia al estado global para actualizar el dashboard.
+    Mantiene la base de datos local sincronizada con el Inbox de Exchange.
     """
-    import time
     state_ref["status"] = "Conectando a Exchange..."
     logger.info("Iniciando el motor de flujo de trabajo de Email AI...")
+    
+    # Inicializar base de datos
+    init_db()
     
     # Intentar una conexión inicial de prueba
     connection_ok = test_connection()
@@ -32,50 +36,69 @@ def main_loop(state_ref):
         state_ref["status"] = "Error de Conexión"
         state_ref["last_error"] = "No se pudo conectar a Exchange"
 
-    # Loop principal
-    processed_ids = set()
     from .ai_responder import AIResponder
     ai = AIResponder()
 
     try:
         while True:
             if state_ref["exchange_connected"]:
-                state_ref["status"] = "Buscando nuevos correos..."
-                from .exchange_connector import get_latest_emails
+                state_ref["status"] = "Sincronizando Inbox..."
                 
-                # Obtener correos sin leer (ahora necesitamos el cuerpo completo o más largo)
-                nuevos_correos = get_latest_emails(count=5)
+                # 1. Obtener los correos más recientes de Exchange (Inbox)
+                data = get_paginated_emails(offset=0, limit=100)
+                nuevos_correos = data.get("emails", [])
+                ids_en_exchange = [e["id"] for e in nuevos_correos]
                 
+                # 2. Asegurarnos de que todos los correos de Exchange estén en nuestra DB
                 for email in nuevos_correos:
-                    e_id = email["id"]
-                    if e_id not in processed_ids:
-                        state_ref["status"] = f"IA pensando respuesta para: {email['subject'][:20]}..."
-                        logger.info(f"Procesando con IA: {email['subject']}")
+                    upsert_email(email)
+                
+                # 3. LIMPIEZA: Si un correo está en DB pero no en los últimos 100 de Exchange, lo borramos.
+                # Esto mantiene la DB como un espejo de la bandeja de entrada actual.
+                try:
+                    conn = get_db_connection()
+                    if conn:
+                        cur = conn.cursor()
+                        cur.execute("SELECT id FROM emails")
+                        ids_en_db = [row[0] for row in cur.fetchall()]
+                        cur.close()
+                        conn.close()
                         
-                        # Crear prompt limpio para la IA (las instrucciones de rol ya están en el llm_service)
-                        prompt = f"Correo recibido de {email['sender']}:\n{email['body']}"
+                        for id_db in ids_en_db:
+                            if id_db not in ids_en_exchange:
+                                delete_email_db(id_db)
+                                logger.info(f"Correo {id_db} eliminado de la DB (Ya no está en el Inbox).")
+                except Exception as e:
+                    logger.error(f"Error en fase de limpieza de DB: {e}")
+
+                # 4. Sincronización de cuerpos (para correos que solo tienen cabeceras)
+                try:
+                    conn = get_db_connection()
+                    if conn:
+                        cur = conn.cursor()
+                        cur.execute("SELECT id FROM emails WHERE (body = '' OR body IS NULL) LIMIT 10")
+                        missing = cur.fetchall()
+                        cur.close()
+                        conn.close()
                         
-                        ai_response = ai.generate_response(prompt, task='generation')
-                        
-                        if ai_response:
-                            email["ai_response"] = ai_response
-                            email["status"] = "PROCESADO"
-                            processed_ids.add(e_id)
-                            state_ref["emails_processed"] += 1
-                        else:
-                            email["status"] = "ERROR_IA"
+                        if missing:
+                            for row in missing:
+                                m_id = row[0]
+                                d = get_email_details(m_id)
+                                if d:
+                                    upsert_email(d)
+                except Exception as e:
+                    logger.error(f"Error en fase de descarga de cuerpos: {e}")
 
                 # Actualizar estado global para el dashboard
                 state_ref["emails"] = nuevos_correos
-                state_ref["status"] = "En espera (Polling)"
-                # logger.info(f"Ciclo completado. {len(nuevos_correos)} correos detectados.")
+                state_ref["status"] = "En espera (Sincronizado)"
             
-            time.sleep(30) # Reducimos a 30 segundos para que sea más dinámico
+            time.sleep(30) 
     except Exception as e:
         logger.error(f"Error inesperado en el loop principal: {str(e)}")
         state_ref["status"] = "Fallo Crítico"
         state_ref["last_error"] = str(e)
 
 if __name__ == "__main__":
-    # Si se ejecuta solo, iniciarlo manualmente
     main_loop({})
