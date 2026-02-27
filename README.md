@@ -6,7 +6,7 @@ Sistema de automatización de respuestas de correo electrónico con inteligencia
 
 - **RAG (Retrieval Augmented Generation)**: Responde correos usando tu base de conocimiento corporativa
 - **Integración Exchange**: Conecta directamente con Microsoft Exchange para gestionar correos
-- **LLM Local**: Modelo de lenguaje TinyLlama 3B 4-bit (sin requerir API externa)
+- **LLM Local**: Modelo de lenguaje Llama 3.2 3B GGUF Q4 (sin requerir API externa)
 - **Base de Conocimiento**: Indexa PDF, DOCX, TXT con búsqueda vectorial (pgvector)
 - **Dashboard Web**: Interfaz moderna y responsive en tiempo real
 - **Contenedores Docker**: Despliegue completo con docker-compose
@@ -52,13 +52,23 @@ DB_NAME=knowledge_base
 
 # LLM Service
 LLM_API_URL=http://llm_service:8000
-LLM_MODEL=TinyLlama-1.1B-Chat-v1.0
+LLM_MODEL=Llama-3.2-3B-Instruct
 
 # App Configuration
 APP_HOST=0.0.0.0
 APP_PORT=8080
 ENVIRONMENT=production
 ```
+
+### 2b. Descargar modelo Llama 3.2 3B
+El modelo debe estar disponible localmente:
+
+```bash
+# Descarga desde Hugging Face
+wget https://huggingface.co/microsoft/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf -O llm_service/models/llama-3.2-3b-instruct-q4_k_m.gguf
+```
+
+Ver detalles en [llm_service/models/README.md](llm_service/models/README.md)
 
 ### 3. Levantar contenedores
 ```bash
@@ -206,10 +216,10 @@ Consulta [data/knowledge_base/politica_seguridad.txt](data/knowledge_base/politi
 - Orquesta lógica de negocio
 - Sirve frontend estático
 
-#### 2. **email_ai_llm** (FastAPI + TinyLlama - Puerto 8000)
-- Modelo de lenguaje local 4-bit quantized
-- API para generación de texto
-- Sin dependencias de APIs externas
+#### 2. **email_ai_llm** (FastAPI + Llama 3.2 3B GGUF - Puerto 8000)
+- Modelo Llama 3.2 3B cuantizado en Q4 (~2.5GB)
+- API para generación de texto con llama.cpp
+- Sin dependencias de APIs externas, solo CPU
 
 #### 3. **email_ai_postgres** (pgvector - Puerto 5432)
 - Base de datos vectorial
@@ -240,17 +250,18 @@ docker-compose up -d --build
 ### config.yaml
 ```yaml
 model:
-  name: TinyLlama-1.1B-Chat-v1.0
+  name: Llama-3.2-3B-Instruct
   device: cpu
-  quantization: 4bit
-  max_tokens: 512
-  temperature: 0.7
+  quantization: Q4_K_M GGUF
+  context_window: 4096
+  max_tokens: 256
+  temperature: 0.1
   top_p: 0.9
   
   tasks:
     generation:
-      temperature: 0.7
-      max_tokens: 512
+      temperature: 0.1
+      max_tokens: 256
     classification:
       temperature: 0.3
       max_tokens: 50

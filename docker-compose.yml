@@ -13,7 +13,7 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
-  # API del Modelo LLM (FastAPI cargando TinyLlama con adaptador en 4-bit)
+  # API del Modelo LLM (FastAPI con Llama 3.2 3B GGUF Q4)
   llm_service:
     build:
       context: ./llm_service
@@ -23,8 +23,8 @@ services:
       - PYTHONUNBUFFERED=1
       - CPU_THREADS=4
     volumes:
-      # Montamos la carpeta del modelo final; asegúrate de que exista la ruta
-      - ./modelo_correos_final:/app/modelo_correos_final
+      # Modelo Llama 3.2 3B en formato GGUF (cuantizado Q4)
+      - ./llm_service/models:/app/models
       - hf_cache:/root/.cache/huggingface
       # Montar app.py para poder editar sin rebuild
       - ./llm_service/app.py:/app/app.py
