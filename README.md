@@ -60,35 +60,62 @@ APP_PORT=8080
 ENVIRONMENT=production
 ```
 
-### 2b. Descargar modelo Llama 3.2 3B
-El modelo debe estar disponible localmente:
+### 3. Levantar contenedores (primera vez)
+
+⚠️ **IMPORTANTE: La primera ejecución descargará el modelo LLM (~2.5GB). Puede tomar 20-30 minutos.**
 
 ```bash
-# Descarga desde Hugging Face
-wget https://huggingface.co/microsoft/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf -O llm_service/models/llama-3.2-3b-instruct-q4_k_m.gguf
+docker-compose up --build
 ```
 
-Ver detalles en [llm_service/models/README.md](llm_service/models/README.md)
+**Qué sucede automáticamente:**
+1. ✅ Se descarga `Llama-3.2-3B-Instruct-Q4_K_M.gguf` desde HuggingFace (dentro del contenedor)
+2. ✅ Se monta en `./llm_service/models/` en tu máquina
+3. ✅ Se construyen todas las imágenes Docker
+4. ✅ Se levantan 3 contenedores: app, LLM, base de datos
 
-### 3. Levantar contenedores
-```bash
-docker-compose up -d
+**Espera a ver este mensaje:**
+```
+✔ Container email_ai_app      Running
+✔ Container email_ai_llm      Running
+✔ Container email_ai_postgres Running
 ```
 
-Espera 2-3 minutos mientras se construyen y arrancan los servicios.
-
-**Verificar estado:**
+Para futuras ejecuciones (mucho más rápidas):
 ```bash
+docker-compose up
+```
+
+### 4. Verificar que todo funciona
+
+```bash
+# Verificar contenedores activos
 docker ps
+
+# Verificar que el LLM repsonde
+curl http://localhost:8000/health
+
+# Verificar que la app repsonde
+curl http://localhost:8080
 ```
 
-Deberías ver:
-- `email_ai_app` - Puerto 8080
-- `email_ai_llm` - Puerto 8000
-- `email_ai_postgres` - Puerto 5432
+Deberías recibir:
+- **LLM health**: `{"status":"ok","technology":"GGUF/llama.cpp","model":"..."}`
+- **App**: Código HTTP 200
 
-### 4. Acceder a la aplicación
+### 5. Acceder a la aplicación
+
 Abre en tu navegador: **http://localhost:8080**
+
+🎉 **¡Ya está funcionando!**
+
+---
+
+## 📚 Documentación del Modelo LLM
+
+Para detalles sobre la descarga, requisitos, troubleshooting y GPU support, ve a:
+
+**[llm_service/models/README.md](llm_service/models/README.md)**
 
 ## 📖 Uso
 

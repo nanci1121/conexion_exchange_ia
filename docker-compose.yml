@@ -1,5 +1,30 @@
+version: '3.8'
+
+# ============================================================================
+# Email AI - Sistema de Automatización de Correos con IA
+# ============================================================================
+# 
+# PRIMERA EJECUCIÓN:
+#   docker-compose up --build
+#   → Descarga Llama 3.2 3B (~2.5GB) automáticamente (20-30 min)
+#   → Construye imágenes y levanta servicios
+#
+# SIGUIENTES EJECUCIONES:
+#   docker-compose up
+#   → Mucho más rápida (~1-2 min) usando imágenes cacheadas
+#
+# PARAR SERVICIOS:
+#   docker-compose down
+#
+# VER LOGS:
+#   docker-compose logs -f email_ai_app
+#
+# ============================================================================
+
 services:
-  # Base de datos para RAG (PostgreSQL con extensión pgvector)
+  # =========================================================================
+  # 1. BASE DE DATOS - PostgreSQL + pgvector para búsqueda vectorial RAG
+  # =========================================================================
   postgres_vectordb:
     image: ankane/pgvector:latest
     container_name: email_ai_postgres
@@ -12,8 +37,28 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-email_ai_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # API del Modelo LLM (FastAPI con Llama 3.2 3B GGUF Q4)
+  # =========================================================================
+  # 2. SERVICIO LLM - FastAPI + Llama 3.2 3B GGUF para generación de texto
+  # =========================================================================
+  # 
+  # ⚠️ IMPORTANTE - Primera ejecución:
+  #    - El Dockerfile descarga automáticamente llama-3.2-3b-instruct-q4_k_m.gguf
+  #    - Descarga desde: HuggingFace (~2.5GB)
+  #    - Se monta en: ./llm_service/models/ en tu máquina (host)
+  #    - Tiempo: 20-30 minutos (depende de tu conexión)
+  #
+  #  Ubicación del archivo descargado:
+  #    Windows: d:\...\llm_service\models\llama-3.2-3b-instruct-q4_k_m.gguf
+  #    Linux/Mac: ./llm_service/models/llama-3.2-3b-instruct-q4_k_m.gguf
+  #
+  #  Ver más detalles en: llm_service/models/README.md
+  # =========================================================================
   llm_service:
     build:
       context: ./llm_service
@@ -23,24 +68,39 @@ services:
       - PYTHONUNBUFFERED=1
       - CPU_THREADS=4
     volumes:
-      # Modelo Llama 3.2 3B en formato GGUF (cuantizado Q4)
+      # Volumen compartido: Dockerfile descarga el modelo aquí
       - ./llm_service/models:/app/models
+      # Cache de HuggingFace para futuras descargas
       - hf_cache:/root/.cache/huggingface
-      # Montar app.py para poder editar sin rebuild
+      # Hot reload: edita app.py sin reconstruir imagen
       - ./llm_service/app.py:/app/app.py
     ports:
       - "8000:8000"
-    # Descomenta las siguientes líneas si tienes NVIDIA Container Toolkit instalado en WSL
+    # GPU SUPPORT (Opcional):
+    # Descomenta si tienes NVIDIA GPU para acelerar 50-100x
     # deploy:
     #   resources:
     #     reservations:
     #       devices:
-    #         - driver: nvidia # Para usar la GPU en WSL (CUDA)
+    #         - driver: nvidia
     #           count: 1
-    #           capabilities: [ gpu ]
+    #           capabilities: [gpu]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Aplicación Principal (lógica de Exchange, RAG)
+  # =========================================================================
+  # 3. APLICACIÓN PRINCIPAL - FastAPI + Frontend para Email AI
+  # =========================================================================
+  # 
+  # Orquesta:
+  #   - Integración Exchange (lectura/escritura correos)
+  #   - RAG (recuperación de documentos + LLM)
+  #   - Dashboard web (http://localhost:8080)
+  # =========================================================================
   email_app:
     build:
       context: ./
@@ -59,16 +119,40 @@ services:
     env_file:
       - .env
     depends_on:
-      - postgres_vectordb
-      - llm_service
+      postgres_vectordb:
+        condition: service_healthy
+      llm_service:
+        condition: service_healthy
     volumes:
-      # Monta el código base
+      # Código fuente (hot reload en desarrollo)
       - ./src:/app/src
-      # También montamos la carpeta global config/
+      # Configuración
       - ./config:/app/config
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8080
+      # Documentos para RAG
+      - ./data/knowledge_base:/app/data/knowledge_base
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+# ============================================================================
+# VOLÚMENES PERSISTENTES
+# ============================================================================
 volumes:
+  # Base de datos PostgreSQL
   pgdata:
+    driver: local
+  # Cache de HuggingFace (modelos descargados)
   hf_cache:
+    driver: local
+
+# ============================================================================
+# REDES
+# ============================================================================
+# Por defecto, docker-compose crea una red bridged que permite comunicación
+# entre contenedores por nombre (ej: postgres_vectordb, llm_service)
+# ============================================================================
+

@@ -1,101 +1,202 @@
-# Modelos LLM
+# Modelos LLM - Llama 3.2 3B GGUF
 
-Esta carpeta contiene los modelos GGUF para el servicio LLM.
+## 🚀 TL;DR - Funcionamiento Automático
 
-## Descargar Llama 3.2 3B GGUF
-
-Para que la aplicación funcione, necesitas descargar el modelo **Llama 3.2 3B Instruct** en formato GGUF cuantizado Q4:
-
-### Opción 1: Descargar desde Hugging Face (Recomendado)
+**No tienes que hacer nada manualmente.** El modelo se descarga automáticamente cuando ejecutas:
 
 ```bash
-# Requiere git-lfs instalado
-git clone https://huggingface.co/Microsoft/Llama-3.2-3B-Instruct-GGUF
-
-# O descargar directamente el archivo
-wget https://huggingface.co/microsoft/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+docker-compose up --build
 ```
 
-### Opción 2: Descargar desde TheBloke (Mirror)
+El `Dockerfile` contiene instrucciones para:
+1. Crear esta carpeta `/app/models` dentro del contenedor
+2. Descargar automáticamente `llama-3.2-3b-instruct-q4_k_m.gguf` desde HuggingFace
+3. Montarla en `./llm_service/models` en tu máquina (host)
 
+## 📦 Lo que sucede automáticamente
+
+### Durante `docker-compose up --build`:
+
+```dockerfile
+# Dockerfile descarga y monta el modelo:
+RUN mkdir -p /app/models
+RUN wget -O /app/models/llama-3.2-3b-instruct-q4_k_m.gguf \
+    https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+```
+
+### Volumen compartido:
+
+```yaml
+# docker-compose.yml:
+volumes:
+  - ./llm_service/models:/app/models  # Host ↔ Contenedor
+```
+
+## ⚙️ Estructura de carpetas
+
+```
+llm_service/
+├── Dockerfile                          # Descarga el modelo automáticamente
+├── app.py                              # API FastAPI + llama.cpp
+├── requirements.txt                    # Dependencias (llama-cpp-python)
+└── models/
+    ├── README.md                       # Este archivo
+    └── llama-3.2-3b-instruct-q4_k_m.gguf  # SE DESCARGA AUTOMÁTICAMENTE (~2.5GB)
+```
+
+## 📥 Primera ejecución
+
+### Paso 1: Clonar repositorio
 ```bash
-wget https://huggingface.co/TheBloke/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+git clone https://github.com/nanci1121/conexion_exchange_ia.git
+cd conexion_exchange_ia
 ```
 
-### Opción 3: Usar script de descarga automática
-
+### Paso 2: Construir con Docker
 ```bash
-python download_model.py
+docker-compose up --build
 ```
 
-## Requisitos
+**Esto hará:**
+- ✅ Construir imagen `email_ai_llm`
+- ✅ Descargar `llama-3.2-3b-instruct-q4_k_m.gguf` (~2.5GB) - TARDA 10-30 MIN
+- ✅ Montar en `./llm_service/models/`
+- ✅ Iniciar servicio en puerto 8000
 
-- Espacio en disco: 2.5GB (para Q4_K_M cuantizado)
-- RAM: 8GB mínimo (16GB recomendado)
-- Conexión a internet estable (descarga ~2.5GB)
+**Tiempo estimado:**
+- Primera vez: 10-30 minutos (descarga + construcción)
+- Siguientes: 1-2 minutos (usa imagen cacheada)
 
-## Estructura esperada
-
-```
-llm_service/models/
-├── llama-3.2-3b-instruct-q4_k_m.gguf    # Modelo principal (~2.5GB)
-└── README.md                              # Este archivo
-```
-
-## Verificar descarga
-
-Una vez descargado, verifica que el archivo existe:
-
+### Paso 3: Verificar que funciona
 ```bash
-ls -lh llm_service/models/llama-3.2-3b-instruct-q4_k_m.gguf
+curl http://localhost:8000/health
 ```
 
-## Información del modelo
+Respuesta esperada:
+```json
+{
+  "status": "ok",
+  "technology": "GGUF/llama.cpp",
+  "model": "TinyLlama-1.1B"
+}
+```
+
+## 🔄 Después de la primera descarga
+
+El archivo `.gguf` estará en tu disco en:
+
+**Windows:**
+```
+d:\02_DESARROLLO\Entrenar_IA_correos\llm_service\models\llama-3.2-3b-instruct-q4_k_m.gguf
+```
+
+**Linux/Mac:**
+```
+./llm_service/models/llama-3.2-3b-instruct-q4_k_m.gguf
+```
+
+### Comportamiento del volumen:
+
+- ✅ **Primera vez**: Se descarga dentro del contenedor → se copia al host
+- ✅ **Siguientes veces**: El contenedor reutiliza el archivo del host (más rápido)
+- ✅ **Persistencia**: El archivo se mantiene entre reinicios
+
+## 📊 Especificaciones del modelo
 
 | Propiedad | Valor |
 |-----------|-------|
-| Modelo | Llama 3.2 3B Instruct |
-| Tamaño | 2.5GB (Q4_K_M cuantizado) |
-| Contexto | 128K tokens (configurado a 4K para correos) |
-| Cuantización | Q4_K_M (4-bit) |
-| Precisión | ~95-98% comparado con fp32 |
-| Velocidad | ~10-15 tokens/seg en CPU (4 threads) |
+| **Nombre** | Llama 3.2 3B Instruct |
+| **Tamaño** | ~2.5GB (ya cuantizado en Q4_K_M) |
+| **Contexto** | 128K tokens (configurado a 4K en app.py) |
+| **Cuantización** | Q4_K_M (4-bit, excelente balance precisión/velocidad) |
+| **Precisión** | ~95-98% vs modelo original fp32 |
+| **Velocidad CPU** | ~10-15 tokens/segundo (4 threads) |
+| **Velocidad GPU** | ~100-150 tokens/segundo (si dispones de NVIDIA) |
+| **RAM requerida** | 8GB mínimo (16GB recomendado) |
+| **Descarga** | <https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF> |
 
-## Notas importantes
+## 🆘 Troubleshooting
 
-1. **No commitear el modelo a Git**: Es demasiado pesado (~2.5GB)
-2. **Ruta correcta**: El archivo DEBE estar en esta carpeta exactamente
-3. **Nombre exacto**: DEBE ser `llama-3.2-3b-instruct-q4_k_m.gguf` (minúsculas)
-4. **Dentro de Docker**: Se monta en `/app/models/` automáticamente
+### "Descarga muy lenta"
 
-## Solución de problemas
+1. **Verifica tu conexión**: Download desde HuggingFace tarda más en ciertos horarios
+2. **Espera**: Primera descarga puede tomar 20-30 minutos con conexión lenta
+3. **Reintentar**: Si se corta, `docker-compose up --build` retoma desde donde quedó
 
-### "Model not found" error
-- Verifica que el archivo está en: `llm_service/models/llama-3.2-3b-instruct-q4_k_m.gguf`
-- Reinicia Docker: `docker-compose restart email_ai_llm`
+### "Model not found" o error en app.py
 
-### "Out of memory" error
-- Reduce `n_ctx` en app.py (actualmente 4096)
-- Usa GPU si disponible (descomenta en docker-compose.yml)
-- Aumenta RAM disponible
+```bash
+# Verifica que existe:
+ls -la llm_service/models/llama-3.2-3b-instruct-q4_k_m.gguf
 
-### Descarga muy lenta
-- Usa un espejo alternativo (TheBloke)
-- Descarga en paralelo con `aria2c`
-- Usa torrent si disponible
-
-## GPU Support (Opcional)
-
-Si tienes NVIDIA GPU, modifica docker-compose.yml:
-
-```yaml
-deploy:
-  resources:
-    reservations:
-      devices:
-        - driver: nvidia
-          count: 1
-          capabilities: [gpu]
+# Si no existe o está incompleto, limpia y reconstruye:
+docker-compose down
+rm -rf llm_service/models/*.gguf
+docker-compose up --build
 ```
 
-Esto acelera significativamente la generación de texto (~100x más rápido).
+### "Out of memory" durante descarga
+
+Si tienes <8GB RAM libre:
+```bash
+# Libera RAM cerrando otras aplicaciones
+# Luego reintenta:
+docker-compose up --build
+```
+
+### "Build fallido en wget"
+
+Si HuggingFace tiene tiempo de espera:
+1. Intenta de nuevo: `docker-compose up --build`
+2. Usa mirror alternativo en Dockerfile:
+   ```dockerfile
+   RUN wget -O /app/models/llama-3.2-3b-instruct-q4_k_m.gguf \
+       https://huggingface.co/TheBloke/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+   ```
+
+## 🚀 GPU Support (Opcional)
+
+Si tienes NVIDIA GPU, descomenta en `docker-compose.yml`:
+
+```yaml
+llm_service:
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+```
+
+Luego reconstruye:
+```bash
+docker-compose up --build
+```
+
+Ganancia de velocidad: **~50-100x más rápido** que CPU.
+
+## 📝 Nota sobre .gitignore
+
+El archivo `.gguf` **NO** debe commitarse al repositorio:
+
+```gitignore
+# Archivo generado/descargado automáticamente
+llm_service/models/*.gguf
+```
+
+Ya está configurado en el `.gitignore` del proyecto.
+
+## ✅ Checklist de despliegue
+
+- [ ] Clonaste el repositorio
+- [ ] Tienes Docker Desktop con WSL2 (Windows) o Docker Engine (Linux/Mac)
+- [ ] Ejecutaste `docker-compose up --build`
+- [ ] Esperaste a que descargue el modelo (~20-30 min)
+- [ ] Verificaste `/health` con curl o navegador
+- [ ] Accediste a http://localhost:8080 (Email AI Dashboard)
+- [ ] Subiste documentos en la pestaña "Conocimiento"
+- [ ] Probaste generando respuestas a correos de prueba
+
+¡Listo! Ya puedes empezar a usar Email AI con RAG. 🚀
+
