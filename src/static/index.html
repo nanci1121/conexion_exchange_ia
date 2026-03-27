@@ -100,6 +100,20 @@
                         <h4 style="color: var(--accent-blue); margin-bottom: 20px;">Conexión Exchange</h4>
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label
+                                style="display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Perfil activo</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <select id="setting-profile-select" class="glass-input" style="width: 100%;"></select>
+                                <button class="btn btn-secondary" type="button" onclick="handleNewProfile()">Nuevo</button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label
+                                style="display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Nombre del perfil</label>
+                            <input type="text" id="setting-profile-name" class="glass-input" style="width: 100%;"
+                                placeholder="Ej: Soporte España">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label
                                 style="display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Usuario
                                 (Email)</label>
                             <input type="text" id="setting-ex-user" class="glass-input" style="width: 100%;">
@@ -117,6 +131,12 @@
                                 de Inicio (UPN) - Opcional</label>
                             <input type="text" id="setting-ex-upn" class="glass-input" style="width: 100%;"
                                 placeholder="p.ej: DOMAIN\usuario">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label
+                                style="display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Carpeta o buzón</label>
+                            <input type="text" id="setting-ex-folder" class="glass-input" style="width: 100%;"
+                                placeholder="INBOX">
                         </div>
                         <div class="form-group" style="margin-bottom: 15px;">
                             <label
@@ -167,7 +187,11 @@
                     </div>
                 </div>
                 <div
-                    style="margin-top: 30px; border-top: 1px solid var(--glass-border); padding-top: 20px; display: flex; justify-content: flex-end;">
+                    style="margin-top: 30px; border-top: 1px solid var(--glass-border); padding-top: 20px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" type="button" onclick="handleActivateProfile()">Activar perfil</button>
+                        <button class="btn btn-danger" type="button" onclick="handleDeleteProfile()">Eliminar perfil</button>
+                    </div>
                     <button class="btn btn-primary" onclick="handleSaveConfig()">Guardar Cambios</button>
                 </div>
             </section>

@@ -21,12 +21,20 @@ class EmailSendRequest(BaseModel):
     language: Optional[str] = 'es'
 
 class ConfigRequest(BaseModel):
+    profile_id: Optional[str] = None
+    profile_name: str
     exchange_user: str
     exchange_pass: Optional[str] = None
     exchange_server: str
     exchange_upn: Optional[str] = None
+    exchange_folder: str = 'INBOX'
     ai_threads: int
     ai_temp: float
+    set_active: bool = True
+
+
+class ActivateProfileRequest(BaseModel):
+    profile_id: str
 
 # =========== General Routes ===========
 
@@ -102,13 +110,39 @@ async def get_config():
 async def update_config(req: ConfigRequest):
     """Update configuration"""
     return await config_service.update_config(
+        req.profile_name,
         req.exchange_user,
         req.exchange_server,
         req.exchange_pass,
         req.exchange_upn,
+        req.exchange_folder,
         req.ai_threads,
-        req.ai_temp
+        req.ai_temp,
+        req.profile_id,
+        req.set_active,
     )
+
+
+@router.get("/api/mail-profiles")
+async def list_mail_profiles():
+    """List configured Exchange mailbox profiles"""
+    config = await config_service.get_config()
+    return {
+        "profiles": config.get("profiles", []),
+        "active_profile_id": config.get("active_profile_id"),
+    }
+
+
+@router.post("/api/mail-profiles/activate")
+async def activate_mail_profile(req: ActivateProfileRequest):
+    """Activate an Exchange mailbox profile"""
+    return await config_service.activate_profile(req.profile_id)
+
+
+@router.delete("/api/mail-profiles/{profile_id}")
+async def delete_mail_profile(profile_id: str):
+    """Delete an Exchange mailbox profile"""
+    return await config_service.remove_profile(profile_id)
 
 # =========== Knowledge Routes ===========
 

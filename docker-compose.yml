@@ -1,9 +1,7 @@
-version: '3.8'
-
 # ============================================================================
 # Email AI - Sistema de Automatización de Correos con IA
 # ============================================================================
-# 
+#
 # PRIMERA EJECUCIÓN:
 #   docker-compose up --build
 #   → Descarga Llama 3.2 3B (~2.5GB) automáticamente (20-30 min)
@@ -29,16 +27,16 @@ services:
     image: ankane/pgvector:latest
     container_name: email_ai_postgres
     environment:
-      POSTGRES_USER: ${DB_USER:-email_ai_user}
-      POSTGRES_PASSWORD: ${DB_PASS:-super_secreto}
-      POSTGRES_DB: knowledge_base
+      POSTGRES_USER: ${DB_USER:?Define DB_USER en .env}
+      POSTGRES_PASSWORD: ${DB_PASS:?Define DB_PASS en .env}
+      POSTGRES_DB: ${DB_NAME:?Define DB_NAME en .env}
     ports:
-      - "5432:5432"
+      - "${DB_BIND_HOST:-127.0.0.1}:${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-email_ai_user}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:?Define DB_USER en .env} -d ${DB_NAME:?Define DB_NAME en .env}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,7 +44,7 @@ services:
   # =========================================================================
   # 2. SERVICIO LLM - FastAPI + Llama 3.2 3B GGUF para generación de texto
   # =========================================================================
-  # 
+  #
   # ⚠️ IMPORTANTE - Primera ejecución:
   #    - El Dockerfile descarga automáticamente llama-3.2-3b-instruct-q4_k_m.gguf
   #    - Descarga desde: HuggingFace (~2.5GB)
@@ -66,7 +64,8 @@ services:
     container_name: email_ai_llm
     environment:
       - PYTHONUNBUFFERED=1
-      - CPU_THREADS=4
+      - CPU_THREADS=${CPU_THREADS:-4}
+      - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       # Volumen compartido: Dockerfile descarga el modelo aquí
       - ./llm_service/models:/app/models
@@ -75,7 +74,7 @@ services:
       # Hot reload: edita app.py sin reconstruir imagen
       - ./llm_service/app.py:/app/app.py
     ports:
-      - "8000:8000"
+      - "${LLM_BIND_HOST:-127.0.0.1}:${LLM_PORT:-8000}:8000"
     # GPU SUPPORT (Opcional):
     # Descomenta si tienes NVIDIA GPU para acelerar 50-100x
     # deploy:
@@ -87,15 +86,16 @@ services:
     #           capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 240s
 
   # =========================================================================
   # 3. APLICACIÓN PRINCIPAL - FastAPI + Frontend para Email AI
   # =========================================================================
-  # 
+  #
   # Orquesta:
   #   - Integración Exchange (lectura/escritura correos)
   #   - RAG (recuperación de documentos + LLM)
@@ -107,15 +107,15 @@ services:
       dockerfile: Dockerfile
     container_name: email_ai_app
     ports:
-      - "8080:8080"
+      - "${APP_BIND_HOST:-127.0.0.1}:${APP_PORT:-8080}:8080"
     environment:
       - PYTHONUNBUFFERED=1
       - DB_HOST=postgres_vectordb
       - DB_PORT=5432
-      - DB_USER=${DB_USER:-email_ai_user}
-      - DB_PASS=${DB_PASS:-super_secreto}
-      - DB_NAME=knowledge_base
-      - LLM_API_URL=http://llm_service:8000
+      - DB_USER=${DB_USER:?Define DB_USER en .env}
+      - DB_PASS=${DB_PASS:?Define DB_PASS en .env}
+      - DB_NAME=${DB_NAME:?Define DB_NAME en .env}
+      - LLM_API_URL=${LLM_API_URL:-http://llm_service:8000}
     env_file:
       - .env
     depends_on:
@@ -126,6 +126,8 @@ services:
     volumes:
       # Código fuente (hot reload en desarrollo)
       - ./src:/app/src
+      # Sincronización de configuración persistida con el .env del proyecto
+      - ./.env:/app/.env
       # Configuración
       - ./config:/app/config
       # Documentos para RAG
@@ -133,7 +135,7 @@ services:
     command: uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -155,4 +157,3 @@ volumes:
 # Por defecto, docker-compose crea una red bridged que permite comunicación
 # entre contenedores por nombre (ej: postgres_vectordb, llm_service)
 # ============================================================================
-

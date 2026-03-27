@@ -2,6 +2,8 @@ let currentPage = 0;
 const limit = 10;
 let currentEmails = [];
 let selectedEmail = null;
+let currentProfiles = [];
+let currentProfileId = null;
 
 async function updateStatus() {
     try {
@@ -22,8 +24,8 @@ async function updateStatus() {
         document.getElementById('stat-latency').innerText = Math.floor(Math.random() * (120 - 80) + 80) + ' ms';
 
         // Actualizar Cabecera con Usuario
-        const userEmail = data.exchange_user || 'Usuario';
-        const userName = userEmail.split('@')[0].split('.')[0];
+        const userEmail = data.exchange_user || data.active_profile_name || 'Usuario';
+        const userName = (data.active_profile_name || userEmail).split('@')[0].split('.')[0];
         document.getElementById('user-name').innerText = userName.charAt(0).toUpperCase() + userName.slice(1);
         document.getElementById('user-avatar').innerText = userEmail.charAt(0).toUpperCase();
 
@@ -296,43 +298,182 @@ async function loadSettings() {
         const response = await fetch('/api/config');
         const data = await response.json();
 
-        document.getElementById('setting-ex-user').value = data.exchange_user || '';
-        document.getElementById('setting-ex-server').value = data.exchange_server || '';
-        document.getElementById('setting-ex-upn').value = data.exchange_upn || '';
-        document.getElementById('setting-ai-threads').value = data.ai_threads || 4;
-        document.getElementById('setting-ai-temp').value = data.ai_temp || 0.1;
+        currentProfiles = data.profiles || [];
+        currentProfileId = data.active_profile_id || data.profile_id || null;
+
+        populateProfileSelector(currentProfiles, currentProfileId);
+        fillSettingsForm(data);
     } catch (e) {
         console.error(e);
     }
 }
 
+function populateProfileSelector(profiles, selectedId) {
+    const select = document.getElementById('setting-profile-select');
+    if (!select) return;
+
+    select.innerHTML = '';
+
+    if (!profiles.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.innerText = 'Sin perfiles configurados';
+        select.appendChild(option);
+        return;
+    }
+
+    profiles.forEach(profile => {
+        const option = document.createElement('option');
+        option.value = profile.id;
+        option.innerText = profile.is_active ? `${profile.name} (activo)` : profile.name;
+        if (profile.id === selectedId) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+}
+
+function fillSettingsForm(data) {
+    document.getElementById('setting-profile-name').value = data.profile_name || '';
+    document.getElementById('setting-ex-user').value = data.exchange_user || '';
+    document.getElementById('setting-ex-server').value = data.exchange_server || '';
+    document.getElementById('setting-ex-upn').value = data.exchange_upn || '';
+    document.getElementById('setting-ex-folder').value = data.exchange_folder || 'INBOX';
+    document.getElementById('setting-ex-pass').value = data.exchange_pass || '';
+    document.getElementById('setting-ai-threads').value = data.ai_threads || 4;
+    document.getElementById('setting-ai-temp').value = data.ai_temp || 0.1;
+}
+
+function getSelectedProfile() {
+    return currentProfiles.find(profile => profile.id === currentProfileId) || null;
+}
+
+function handleNewProfile() {
+    currentProfileId = null;
+    document.getElementById('setting-profile-select').value = '';
+    fillSettingsForm({
+        profile_name: '',
+        exchange_user: '',
+        exchange_server: '',
+        exchange_upn: '',
+        exchange_folder: 'INBOX',
+        exchange_pass: '',
+        ai_threads: document.getElementById('setting-ai-threads').value || 4,
+        ai_temp: document.getElementById('setting-ai-temp').value || 0.1,
+    });
+}
+
+async function handleActivateProfile() {
+    const select = document.getElementById('setting-profile-select');
+    const profileId = select ? select.value : null;
+    if (!profileId) {
+        alert('Selecciona un perfil para activarlo.');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/mail-profiles/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_id: profileId })
+        });
+        const data = await response.json();
+        alert(data.message);
+        await loadSettings();
+        await fetchEmails();
+        await updateStatus();
+    } catch (e) {
+        alert('Error al activar el perfil.');
+    }
+}
+
+async function handleDeleteProfile() {
+    const select = document.getElementById('setting-profile-select');
+    const profileId = select ? select.value : null;
+    if (!profileId) {
+        alert('Selecciona un perfil para eliminarlo.');
+        return;
+    }
+    if (!confirm('¿Eliminar este perfil y sus correos sincronizados?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/mail-profiles/${profileId}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        alert(data.message);
+        await loadSettings();
+        await fetchEmails();
+        await updateStatus();
+    } catch (e) {
+        alert('Error al eliminar el perfil.');
+    }
+}
+
 async function handleSaveConfig() {
+    const profileName = document.getElementById('setting-profile-name').value;
     const user = document.getElementById('setting-ex-user').value;
     const server = document.getElementById('setting-ex-server').value;
     const upn = document.getElementById('setting-ex-upn').value;
+    const folder = document.getElementById('setting-ex-folder').value;
     const pass = document.getElementById('setting-ex-pass').value;
     const threads = parseInt(document.getElementById('setting-ai-threads').value);
     const temp = parseFloat(document.getElementById('setting-ai-temp').value);
+
+    if (!profileName || !user || !server) {
+        alert('Completa nombre de perfil, usuario y servidor.');
+        return;
+    }
 
     try {
         const response = await fetch('/api/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                profile_id: currentProfileId,
+                profile_name: profileName,
                 exchange_user: user,
                 exchange_server: server,
                 exchange_upn: upn,
+                exchange_folder: folder,
                 exchange_pass: (pass && pass !== "••••••••") ? pass : null,
                 ai_threads: threads,
-                ai_temp: temp
+                ai_temp: temp,
+                set_active: true
             })
         });
         const data = await response.json();
         alert(data.message);
+        await loadSettings();
+        await fetchEmails();
+        await updateStatus();
     } catch (e) {
         alert('Error al guardar la configuración');
     }
 }
+
+document.addEventListener('change', (event) => {
+    if (event.target && event.target.id === 'setting-profile-select') {
+        const selectedId = event.target.value;
+        currentProfileId = selectedId || null;
+        const profile = currentProfiles.find(item => item.id === selectedId);
+        if (profile) {
+            fillSettingsForm({
+                profile_id: profile.id,
+                profile_name: profile.name,
+                exchange_user: profile.email,
+                exchange_server: profile.server,
+                exchange_upn: profile.upn,
+                exchange_folder: profile.folder,
+                exchange_pass: '••••••••',
+                ai_threads: document.getElementById('setting-ai-threads').value || 4,
+                ai_temp: document.getElementById('setting-ai-temp').value || 0.1,
+            });
+        }
+    }
+});
 
 setInterval(updateStatus, 5000);
 updateStatus();

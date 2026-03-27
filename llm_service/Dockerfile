@@ -18,11 +18,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Creamos directorio para el modelo si no existe
 RUN mkdir -p /app/models
 
-# Llama-3.2-3B es mucho más potente y tiene mejor manejo de instrucciones que TinyLlama
-RUN wget -O /app/models/llama-3.2-3b-instruct-q4_k_m.gguf https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
-
 COPY . .
+
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/entrypoint.sh"]

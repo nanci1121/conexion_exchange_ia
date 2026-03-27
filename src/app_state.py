@@ -2,6 +2,9 @@
 app_state = {
     "status": "Iniciando...",
     "exchange_connected": False,
+    "exchange_user": None,
+    "active_profile_id": None,
+    "active_profile_name": None,
     "emails_processed": 0,
     "emails": [],
     "current_email": None,

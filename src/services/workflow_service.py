@@ -8,7 +8,14 @@ import time
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from ..infrastructure.exchange.connector import test_connection, get_paginated_emails, get_email_details
-from ..infrastructure.database.postgres import init_db, upsert_email, update_email_status, delete_email_db, get_db_connection
+from ..infrastructure.database.postgres import (
+    delete_email_db,
+    get_active_mail_profile,
+    get_emails_missing_body,
+    get_profile_email_map,
+    init_db,
+    upsert_email,
+)
 
 logger = logging.getLogger("WorkflowEngine")
 
@@ -23,8 +30,18 @@ def main_loop(state_ref):
     # Inicializar base de datos
     init_db()
     
+    active_profile = get_active_mail_profile()
+    if active_profile:
+        state_ref["exchange_user"] = active_profile.get("email")
+        state_ref["active_profile_id"] = active_profile.get("id")
+        state_ref["active_profile_name"] = active_profile.get("name")
+    else:
+        state_ref["exchange_user"] = None
+        state_ref["active_profile_id"] = None
+        state_ref["active_profile_name"] = None
+
     # Intentar una conexión inicial de prueba
-    connection_ok = test_connection()
+    connection_ok = test_connection(active_profile.get("id") if active_profile else None)
     
     if connection_ok:
         logger.info("Conexión inicial exitosa.")
@@ -33,20 +50,31 @@ def main_loop(state_ref):
     else:
         logger.warning("No se pudo establecer la conexión inicial. Revisa tu archivo .env")
         state_ref["exchange_connected"] = False
-        state_ref["status"] = "Error de Conexión"
-        state_ref["last_error"] = "No se pudo conectar a Exchange"
-
-    from ..domain.ai.responder import AIResponder
-    ai = AIResponder()
+        state_ref["status"] = "Error de Conexión" if active_profile else "Sin perfil activo"
+        state_ref["last_error"] = "No se pudo conectar a Exchange" if active_profile else "No hay perfil Exchange activo"
 
     try:
         while True:
+            active_profile = get_active_mail_profile()
+            profile_id = active_profile.get("id") if active_profile else None
+            state_ref["exchange_user"] = active_profile.get("email") if active_profile else None
+            state_ref["active_profile_id"] = profile_id
+            state_ref["active_profile_name"] = active_profile.get("name") if active_profile else None
+
+            if not profile_id:
+                state_ref["exchange_connected"] = False
+                state_ref["status"] = "Sin perfil activo"
+                state_ref["last_error"] = "Configura y activa un perfil Exchange para iniciar la sincronizacion"
+                time.sleep(10)
+                continue
+
             # Si no estamos conectados, intentar conectar antes de procesar
             if not state_ref.get("exchange_connected", False):
                 state_ref["status"] = "Intentando re-conexión..."
-                if test_connection():
+                if test_connection(profile_id):
                     state_ref["exchange_connected"] = True
                     state_ref["status"] = "Conexión Recuperada"
+                    state_ref["last_error"] = None
                 else:
                     state_ref["exchange_connected"] = False
                     state_ref["status"] = "Error de Conexión (Re-intentando)"
@@ -55,54 +83,40 @@ def main_loop(state_ref):
                 state_ref["status"] = "Sincronizando Inbox..."
                 
                 # 1. Obtener los correos más recientes de Exchange (Inbox)
-                data = get_paginated_emails(offset=0, limit=100)
+                data = get_paginated_emails(offset=0, limit=100, profile_id=profile_id)
                 nuevos_correos = data.get("emails", [])
                 ids_en_exchange = [e["id"] for e in nuevos_correos]
                 
                 # 2. Asegurarnos de que todos los correos de Exchange estén en nuestra DB
                 for email in nuevos_correos:
-                    upsert_email(email)
+                    upsert_email(email, profile_id)
                 
                 # 3. LIMPIEZA: Si un correo está en DB pero no en los últimos 100 de Exchange, lo borramos.
                 # Esto mantiene la DB como un espejo de la bandeja de entrada actual.
                 try:
-                    conn = get_db_connection()
-                    if conn:
-                        cur = conn.cursor()
-                        cur.execute("SELECT id FROM emails")
-                        ids_en_db = [row[0] for row in cur.fetchall()]
-                        cur.close()
-                        conn.close()
-                        
-                        for id_db in ids_en_db:
-                            if id_db not in ids_en_exchange:
-                                delete_email_db(id_db)
-                                logger.info(f"Correo {id_db} eliminado de la DB (Ya no está en el Inbox).")
+                    ids_en_db = get_profile_email_map(profile_id)
+                    for row in ids_en_db:
+                        if row["exchange_id"] not in ids_en_exchange:
+                            delete_email_db(row["id"], profile_id)
+                            logger.info(f"Correo {row['id']} eliminado de la DB (Ya no está en el Inbox del perfil activo).")
                 except Exception as e:
                     logger.error(f"Error en fase de limpieza de DB: {e}")
 
                 # 4. Sincronización de cuerpos (para correos que solo tienen cabeceras)
                 try:
-                    conn = get_db_connection()
-                    if conn:
-                        cur = conn.cursor()
-                        cur.execute("SELECT id FROM emails WHERE (body = '' OR body IS NULL) LIMIT 50")
-                        missing = cur.fetchall()
-                        cur.close()
-                        conn.close()
-                        
-                        if missing:
-                            for row in missing:
-                                m_id = row[0]
-                                d = get_email_details(m_id)
-                                if d:
-                                    upsert_email(d)
+                    missing = get_emails_missing_body(profile_id, limit=50)
+                    if missing:
+                        for row in missing:
+                            detail = get_email_details(row["exchange_id"], profile_id)
+                            if detail:
+                                upsert_email(detail, profile_id)
                 except Exception as e:
                     logger.error(f"Error en fase de descarga de cuerpos: {e}")
 
                 # Actualizar estado global para el dashboard
                 state_ref["emails"] = nuevos_correos
                 state_ref["status"] = "En espera (Sincronizado)"
+                state_ref["last_error"] = None
             
             time.sleep(30) 
     except Exception as e:
