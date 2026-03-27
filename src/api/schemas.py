@@ -17,3 +17,26 @@ class EmailDetailSchema(EmailSchema):
 class SettingSchema(BaseModel):
     key: str
     value: str
+
+
+class MailProfileSchema(BaseModel):
+    id: str
+    name: str
+    email: str
+    server: str
+    upn: Optional[str] = None
+    folder: str = "INBOX"
+    is_active: bool = False
+
+
+class MailProfileUpsertSchema(BaseModel):
+    profile_id: Optional[str] = None
+    profile_name: str
+    exchange_user: str
+    exchange_server: str
+    exchange_pass: Optional[str] = None
+    exchange_upn: Optional[str] = None
+    exchange_folder: str = "INBOX"
+    ai_threads: int = 4
+    ai_temp: float = 0.1
+    set_active: bool = True

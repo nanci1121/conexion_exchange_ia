@@ -1,5 +1,10 @@
 # 📧 Email AI - Asistente Inteligente de Correos
 
+[![CI - Validación y Tests](https://github.com/nanci1121/conexion_exchange_ia/actions/workflows/ci.yml/badge.svg)](https://github.com/nanci1121/conexion_exchange_ia/actions/workflows/ci.yml)
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Sistema de automatización de respuestas de correo electrónico con inteligencia artificial, integración con Exchange y búsqueda aumentada por recuperación (RAG).
 
 ## 🚀 Características

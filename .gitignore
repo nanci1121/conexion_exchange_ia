@@ -11,6 +11,7 @@ modelo_correos_final/
 *.h5
 *.pt
 *.onnx
+*.gguf
 
 # Python
 __pycache__/
